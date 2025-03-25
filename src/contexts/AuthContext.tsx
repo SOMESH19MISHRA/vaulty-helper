@@ -45,12 +45,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const signUp = async (email: string, password: string) => {
     try {
       setLoading(true);
+      console.log("Attempting to sign up with:", email);
+      
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error("Supabase signup error:", error);
+        throw error;
+      }
+      
+      console.log("Signup response:", data);
+      
+      if (!data.user) {
+        toast.error("Failed to create account. Please try again.");
+        return;
+      }
       
       if (data.user?.identities?.length === 0) {
         // User already exists
@@ -69,8 +81,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         navigate('/dashboard');
       }
     } catch (error: any) {
-      toast.error(error.error_description || error.message || "An error occurred during sign up");
       console.error("Registration error:", error);
+      
+      // Handle network errors
+      if (error.message === 'Failed to fetch') {
+        toast.error("Network error. Please check your internet connection and try again.");
+      } else {
+        toast.error(error.error_description || error.message || "An error occurred during sign up");
+      }
     } finally {
       setLoading(false);
     }
@@ -79,17 +97,31 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const signIn = async (email: string, password: string) => {
     try {
       setLoading(true);
-      const { error } = await supabase.auth.signInWithPassword({
+      console.log("Attempting to sign in with:", email);
+      
+      const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error("Supabase signin error:", error);
+        throw error;
+      }
+      
+      console.log("Signin response:", data);
       
       toast.success("Signed in successfully!");
       navigate('/dashboard');
     } catch (error: any) {
-      toast.error(error.error_description || error.message || "Invalid login credentials");
+      console.error("Login error:", error);
+      
+      // Handle network errors
+      if (error.message === 'Failed to fetch') {
+        toast.error("Network error. Please check your internet connection and try again.");
+      } else {
+        toast.error(error.error_description || error.message || "Invalid login credentials");
+      }
     } finally {
       setLoading(false);
     }
