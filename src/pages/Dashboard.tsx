@@ -1,12 +1,49 @@
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import NavBar from '@/components/NavBar';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import FileUpload from '@/components/FileUpload';
+import FileList from '@/components/FileList';
+import { supabase } from '@/lib/supabase';
+import { toast } from 'sonner';
 
 const Dashboard = () => {
   const { user, loading } = useAuth();
+  const [files, setFiles] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+
+  const fetchFiles = async () => {
+    if (!user) return;
+    
+    try {
+      setIsLoading(true);
+      const { data, error } = await supabase
+        .storage
+        .from('user-files')
+        .list(`${user.id}`, {
+          sortBy: { column: 'created_at', order: 'desc' },
+        });
+
+      if (error) {
+        throw error;
+      }
+
+      setFiles(data || []);
+    } catch (error: any) {
+      console.error('Error fetching files:', error);
+      toast.error('Failed to load your files');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (user) {
+      fetchFiles();
+    }
+  }, [user]);
 
   if (loading) {
     return (
@@ -19,6 +56,11 @@ const Dashboard = () => {
   if (!user) {
     return <Navigate to="/login" replace />;
   }
+
+  const handleUploadSuccess = () => {
+    fetchFiles();
+    toast.success('File uploaded successfully');
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white flex flex-col">
@@ -37,8 +79,14 @@ const Dashboard = () => {
                 <CardDescription>Access and manage your secure files</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="h-40 flex items-center justify-center bg-blue-50 rounded-lg">
-                  <p className="text-muted-foreground">No files uploaded yet</p>
+                <FileUpload userId={user.id} onUploadSuccess={handleUploadSuccess} />
+                <div className="mt-4">
+                  <FileList 
+                    files={files} 
+                    isLoading={isLoading} 
+                    userId={user.id} 
+                    onFileDeleted={fetchFiles} 
+                  />
                 </div>
               </CardContent>
             </Card>
@@ -72,10 +120,15 @@ const Dashboard = () => {
                 <CardDescription>Monitor your storage usage</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="h-40 flex items-center justify-center bg-blue-50 rounded-lg">
+                <div className="h-40 flex flex-col items-center justify-center bg-blue-50 rounded-lg">
+                  <div className="text-center mb-2">
+                    <p className="text-2xl font-bold text-cloud">{files.length}</p>
+                    <p className="text-muted-foreground">files uploaded</p>
+                  </div>
                   <div className="text-center">
-                    <p className="text-2xl font-bold text-cloud">0%</p>
-                    <p className="text-muted-foreground">of storage used</p>
+                    <p className="text-sm text-muted-foreground mt-2">
+                      Powered by Supabase Storage
+                    </p>
                   </div>
                 </div>
               </CardContent>
