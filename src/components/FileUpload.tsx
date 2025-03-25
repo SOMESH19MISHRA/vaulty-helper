@@ -19,9 +19,9 @@ const FileUpload: React.FC<FileUploadProps> = ({ userId, onUploadSuccess }) => {
     
     const file = files[0];
     
-    // Validate file size (limit to 5MB)
-    if (file.size > 5 * 1024 * 1024) {
-      toast.error('File size exceeds 5MB limit');
+    // Increase file size limit to 50MB (from 5MB)
+    if (file.size > 50 * 1024 * 1024) {
+      toast.error('File size exceeds 50MB limit');
       return;
     }
     
@@ -67,7 +67,7 @@ const FileUpload: React.FC<FileUploadProps> = ({ userId, onUploadSuccess }) => {
             <Upload className="h-6 w-6 mb-2" />
             <span>{isUploading ? 'Uploading...' : 'Upload File'}</span>
             <p className="text-xs text-muted-foreground mt-1">
-              Max file size: 5MB
+              Max file size: 50MB
             </p>
           </div>
         </Button>
