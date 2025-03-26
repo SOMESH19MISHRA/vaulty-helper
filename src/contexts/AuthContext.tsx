@@ -2,6 +2,7 @@
 import React, { createContext, useState, useEffect, useContext } from 'react';
 import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
+import { createUserBucket } from '@/lib/aws';
 import { toast } from "sonner";
 import { useNavigate } from 'react-router-dom';
 
@@ -69,6 +70,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         toast.error("This email is already registered. Please log in instead.");
         navigate('/login');
         return;
+      }
+
+      // Create S3 bucket for the new user
+      if (data.user) {
+        const bucketName = await createUserBucket(data.user.id);
+        
+        if (bucketName) {
+          console.log(`Created S3 bucket: ${bucketName} for user ${data.user.id}`);
+          toast.success("Your personal storage bucket has been set up successfully!");
+        } else {
+          console.error("Failed to create S3 bucket for user");
+          toast.error("Account created, but we couldn't set up your storage bucket. Please contact support.");
+        }
       }
 
       if (data.user && !data.session) {
