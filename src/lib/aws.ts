@@ -21,6 +21,8 @@ export const createUserBucket = async (userId: string): Promise<string | null> =
     const bucketName = `user-bucket-${userId.replace(/[^a-z0-9]/gi, '').toLowerCase()}`;
     
     console.log(`Creating bucket: ${bucketName}`);
+    console.log(`Using AWS Region: ${AWS_REGION}`);
+    console.log(`Using Access Key ID: ${AWS_ACCESS_KEY.slice(0, 5)}...`); // Only log first 5 chars for security
     
     // Set up the bucket creation parameters
     const params: CreateBucketCommandInput = {
@@ -51,6 +53,11 @@ export const createUserBucket = async (userId: string): Promise<string | null> =
     return bucketName;
   } catch (error) {
     console.error("Error creating user bucket:", error);
+    if (error instanceof Error) {
+      console.error("Error message:", error.message);
+      console.error("Error name:", error.name);
+      console.error("Error stack:", error.stack);
+    }
     return null;
   }
 };
