@@ -7,7 +7,7 @@ const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYm
 
 // AWS Configuration (would typically come from environment variables)
 export const AWS_REGION = "us-east-1";
-export const AWS_ACCESS_KEY = ""; // This would be filled with actual credentials
-export const AWS_SECRET_KEY = ""; // This would be filled with actual credentials
+export const AWS_ACCESS_KEY = "AKIAST6S7LIAMBQXH4UT"; 
+export const AWS_SECRET_KEY = "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";
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
