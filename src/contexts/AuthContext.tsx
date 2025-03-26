@@ -1,4 +1,3 @@
-
 import React, { createContext, useState, useEffect, useContext } from 'react';
 import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
@@ -24,7 +23,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const navigate = useNavigate();
 
   useEffect(() => {
-    // Set up listener for auth state changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (_event, session) => {
         setSession(session);
@@ -33,7 +31,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     );
 
-    // Initial session fetch
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setUser(session?.user ?? null);
@@ -72,16 +69,33 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return;
       }
 
-      // Create S3 bucket for the new user
+      // Create S3 bucket for the new user - with retry logic
       if (data.user) {
-        const bucketName = await createUserBucket(data.user.id);
-        
-        if (bucketName) {
-          console.log(`Created S3 bucket: ${bucketName} for user ${data.user.id}`);
-          toast.success("Your personal storage bucket has been set up successfully!");
-        } else {
-          console.error("Failed to create S3 bucket for user");
-          toast.error("Account created, but we couldn't set up your storage bucket. Please contact support.");
+        try {
+          let bucketName = null;
+          let retries = 0;
+          const maxRetries = 3;
+          
+          while (!bucketName && retries < maxRetries) {
+            bucketName = await createUserBucket(data.user.id);
+            if (!bucketName) {
+              console.log(`Bucket creation attempt ${retries + 1} failed, retrying...`);
+              retries++;
+              // Wait for a short time before retrying
+              await new Promise(resolve => setTimeout(resolve, 1000));
+            }
+          }
+
+          if (bucketName) {
+            console.log(`Created S3 bucket: ${bucketName} for user ${data.user.id}`);
+            toast.success("Your personal storage bucket has been set up successfully!");
+          } else {
+            console.error("Failed to create S3 bucket for user after multiple attempts");
+            toast.error("Account created, but we couldn't set up your storage bucket. Please contact support.");
+          }
+        } catch (bucketError) {
+          console.error("Error in bucket creation process:", bucketError);
+          toast.error("Account created, but storage setup failed. Please contact support.");
         }
       }
 
