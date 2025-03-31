@@ -1,8 +1,9 @@
+
 import React, { useState, useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
-import Logo from "./Logo";
+import { Cloud, Shield } from "lucide-react";
 
 const NavBar: React.FC = () => {
   const { user, signOut } = useAuth();
@@ -29,7 +30,11 @@ const NavBar: React.FC = () => {
       <div className="container max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center">
           <Link to="/" className="flex items-center space-x-2">
-            <Logo />
+            <Shield className="text-cloud w-8 h-8" />
+            <Cloud className="text-cloud-light w-8 h-8" />
+            <span className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-cloud to-cloud-light">
+              CloudVault
+            </span>
           </Link>
 
           <nav className="hidden md:flex items-center space-x-1">
