@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
@@ -6,7 +5,7 @@ import NavBar from '@/components/NavBar';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import FileUpload from '@/components/FileUpload';
 import FileList from '@/components/FileList';
-import { supabase } from '@/lib/supabase';
+import { listUserFiles } from '@/lib/aws';
 import { toast } from 'sonner';
 
 const Dashboard = () => {
@@ -19,18 +18,9 @@ const Dashboard = () => {
     
     try {
       setIsLoading(true);
-      const { data, error } = await supabase
-        .storage
-        .from('user-files')
-        .list(`${user.id}`, {
-          sortBy: { column: 'created_at', order: 'desc' },
-        });
-
-      if (error) {
-        throw error;
-      }
-
-      setFiles(data || []);
+      
+      const { files: fileList } = await listUserFiles(user.id);
+      setFiles(fileList || []);
     } catch (error: any) {
       console.error('Error fetching files:', error);
       toast.error('Failed to load your files');

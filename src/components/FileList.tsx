@@ -1,10 +1,10 @@
 
 import React from 'react';
-import { supabase } from '@/lib/supabase';
 import { Button } from '@/components/ui/button';
 import { Download, Trash2, FileIcon } from 'lucide-react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { toast } from 'sonner';
+import { generateDownloadUrl, deleteFile } from '@/lib/aws';
 
 interface FileListProps {
   files: any[];
@@ -26,43 +26,46 @@ const FileList: React.FC<FileListProps> = ({ files, isLoading, userId, onFileDel
     return new Date(timestamp).toLocaleString();
   };
 
-  const handleDownload = async (filePath: string, fileName: string) => {
+  const handleDownload = async (fileKey: string, fileName: string) => {
     try {
-      const { data, error } = await supabase.storage
-        .from('user-files')
-        .download(`${userId}/${filePath}`);
+      toast.loading('Preparing download...');
       
-      if (error) throw error;
+      // Get pre-signed download URL
+      const { downloadUrl } = await generateDownloadUrl(fileKey);
       
       // Create a download link and trigger download
-      const url = URL.createObjectURL(data);
       const a = document.createElement('a');
-      a.href = url;
+      a.href = downloadUrl;
       a.download = fileName;
       document.body.appendChild(a);
       a.click();
-      URL.revokeObjectURL(url);
+      URL.revokeObjectURL(downloadUrl);
       document.body.removeChild(a);
+      
+      toast.dismiss();
+      toast.success('Download started');
     } catch (error) {
       console.error('Error downloading file:', error);
+      toast.dismiss();
       toast.error('Failed to download file');
     }
   };
 
-  const handleDelete = async (filePath: string) => {
+  const handleDelete = async (fileKey: string) => {
     if (!confirm('Are you sure you want to delete this file?')) return;
     
     try {
-      const { error } = await supabase.storage
-        .from('user-files')
-        .remove([`${userId}/${filePath}`]);
+      toast.loading('Deleting file...');
       
-      if (error) throw error;
+      // Delete the file from S3
+      await deleteFile(fileKey);
       
+      toast.dismiss();
       toast.success('File deleted successfully');
       onFileDeleted();
     } catch (error) {
       console.error('Error deleting file:', error);
+      toast.dismiss();
       toast.error('Failed to delete file');
     }
   };
@@ -96,23 +99,26 @@ const FileList: React.FC<FileListProps> = ({ files, isLoading, userId, onFileDel
         </TableHeader>
         <TableBody>
           {files.map((file) => (
-            <TableRow key={file.id}>
+            <TableRow key={file.id || file.fileKey}>
               <TableCell className="font-medium flex items-center gap-2">
                 <FileIcon className="h-4 w-4 shrink-0" />
-                <span className="truncate max-w-[150px]">{file.name}</span>
+                <span className="truncate max-w-[150px]">{file.name || file.fileName || file.fileKey.split('/').pop()}</span>
               </TableCell>
               <TableCell className="hidden sm:table-cell">
-                {formatFileSize(file.metadata?.size || 0)}
+                {formatFileSize(file.metadata?.size || file.size || 0)}
               </TableCell>
               <TableCell className="hidden md:table-cell">
-                {formatDate(file.created_at)}
+                {formatDate(file.created_at || file.uploadedAt || file.lastModified)}
               </TableCell>
               <TableCell className="text-right">
                 <div className="flex justify-end gap-2">
                   <Button
                     variant="ghost"
                     size="icon"
-                    onClick={() => handleDownload(file.name, file.name.split('-').slice(1).join('-'))}
+                    onClick={() => handleDownload(
+                      file.fileKey || `users/${userId}/${file.name}`, 
+                      (file.name || file.fileName || '').split('-').slice(1).join('-') || file.fileKey?.split('/').pop() || 'download'
+                    )}
                     title="Download"
                   >
                     <Download className="h-4 w-4" />
@@ -120,7 +126,7 @@ const FileList: React.FC<FileListProps> = ({ files, isLoading, userId, onFileDel
                   <Button
                     variant="ghost"
                     size="icon"
-                    onClick={() => handleDelete(file.name)}
+                    onClick={() => handleDelete(file.fileKey || `users/${userId}/${file.name}`)}
                     title="Delete"
                     className="text-destructive hover:bg-destructive/10"
                   >
