@@ -2,8 +2,8 @@
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Upload } from 'lucide-react';
-import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
+import { generateUploadUrl, uploadFileWithPresignedUrl } from '@/lib/aws';
 
 interface FileUploadProps {
   userId: string;
@@ -28,15 +28,22 @@ const FileUpload: React.FC<FileUploadProps> = ({ userId, onUploadSuccess }) => {
     try {
       setIsUploading(true);
       
-      // Create a unique file path with user ID as a folder name
-      const filePath = `${userId}/${Date.now()}-${file.name}`;
+      // 1. Generate a pre-signed URL for direct upload to S3
+      const { uploadUrl, fileKey } = await generateUploadUrl(
+        file.name,
+        file.type,
+        userId
+      );
       
-      const { error } = await supabase.storage
-        .from('user-files')
-        .upload(filePath, file);
+      // 2. Upload the file directly to S3 using the pre-signed URL
+      await uploadFileWithPresignedUrl(file, uploadUrl, file.type);
+      
+      // 3. Store a reference to the file in Supabase
+      const { error } = await storeFileReference(userId, fileKey, file.name, file.type, file.size);
       
       if (error) throw error;
       
+      toast.success('File uploaded successfully to S3');
       onUploadSuccess();
       e.target.value = '';
     } catch (error: any) {
@@ -45,6 +52,31 @@ const FileUpload: React.FC<FileUploadProps> = ({ userId, onUploadSuccess }) => {
     } finally {
       setIsUploading(false);
     }
+  };
+  
+  // Helper function to store file metadata in Supabase
+  const storeFileReference = async (
+    userId: string, 
+    fileKey: string, 
+    fileName: string, 
+    fileType: string, 
+    fileSize: number
+  ) => {
+    const { data, error } = await fetch('/api/store-file-reference', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        userId,
+        fileKey,
+        fileName,
+        fileType,
+        fileSize
+      }),
+    }).then(res => res.json());
+    
+    return { data, error };
   };
 
   return (
