@@ -1,9 +1,9 @@
-
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import NavBar from '@/components/NavBar';
+import { Cloud, Shield } from 'lucide-react';
 
 const Index = () => {
   const { user } = useAuth();
@@ -15,6 +15,10 @@ const Index = () => {
       <main className="flex-1 flex flex-col">
         {/* Hero Section */}
         <section className="pt-32 pb-20 px-4 sm:px-6 lg:px-8 flex flex-col items-center text-center">
+          <div className="flex items-center justify-center mb-6">
+            <Shield className="text-cloud w-16 h-16 mr-4" />
+            <Cloud className="text-cloud-light w-16 h-16" />
+          </div>
           <h1 className="text-5xl md:text-6xl font-bold tracking-tight mb-6 max-w-4xl mx-auto animate-fade-up">
             Secure Cloud Storage for <span className="bg-clip-text text-transparent bg-gradient-to-r from-cloud to-cloud-light">Everything You Value</span>
           </h1>
