@@ -13,16 +13,41 @@ const s3Client = new S3Client({
 });
 
 /**
+ * Checks if a bucket exists
+ * @param bucketName - The name of the bucket to check
+ * @returns Boolean indicating if the bucket exists
+ */
+const bucketExists = async (bucketName: string): Promise<boolean> => {
+  try {
+    const command = new HeadBucketCommand({ Bucket: bucketName });
+    await s3Client.send(command);
+    console.log(`Bucket ${bucketName} exists`);
+    return true;
+  } catch (error) {
+    console.log(`Bucket ${bucketName} does not exist or is not accessible`);
+    // If error code is 404, bucket does not exist
+    // If error code is 403, bucket exists but you don't have access
+    // For our purposes, if we can't access it, we need to create a new one
+    return false;
+  }
+};
+
+/**
  * Creates an S3 bucket for a user and stores the bucket name in Supabase
  */
 export const createUserBucket = async (userId: string): Promise<string | null> => {
   try {
     // Generate a unique bucket name using the user ID
-    const bucketName = `user-bucket-${userId.replace(/[^a-z0-9]/gi, '').toLowerCase()}`;
+    const bucketName = `cloudvault-storage-user-${userId.replace(/[^a-z0-9]/gi, '').toLowerCase()}`;
     
     console.log(`Attempting to create bucket: ${bucketName}`);
-    console.log(`Using AWS Region: ${AWS_REGION}`);
-    console.log(`Using Access Key ID: ${AWS_ACCESS_KEY.slice(0, 5)}...`); // Only log first 5 chars for security
+    
+    // Check if the bucket already exists
+    const exists = await bucketExists(bucketName);
+    if (exists) {
+      console.log(`Bucket ${bucketName} already exists, skipping creation`);
+      return bucketName;
+    }
     
     // Special case for us-east-1 region
     let params: CreateBucketCommandInput;
@@ -30,14 +55,15 @@ export const createUserBucket = async (userId: string): Promise<string | null> =
     if (AWS_REGION === 'us-east-1') {
       params = {
         Bucket: bucketName,
-        // Do not specify LocationConstraint for us-east-1
+        ACL: 'private', // Ensure private ACL for data confidentiality
       };
     } else {
       params = {
         Bucket: bucketName,
         CreateBucketConfiguration: {
           LocationConstraint: AWS_REGION
-        }
+        },
+        ACL: 'private', // Ensure private ACL for data confidentiality
       };
     }
     
@@ -45,32 +71,6 @@ export const createUserBucket = async (userId: string): Promise<string | null> =
     const command = new CreateBucketCommand(params);
     const response = await s3Client.send(command);
     console.log("Bucket created successfully:", response);
-    
-    // Set bucket policy to allow public read access if needed
-    try {
-      const policyParams = {
-        Bucket: bucketName,
-        Policy: JSON.stringify({
-          Version: "2012-10-17",
-          Statement: [
-            {
-              Sid: "PublicReadGetObject",
-              Effect: "Allow",
-              Principal: "*",
-              Action: ["s3:GetObject"],
-              Resource: [`arn:aws:s3:::${bucketName}/*`]
-            }
-          ]
-        })
-      };
-      
-      const policyCommand = new PutBucketPolicyCommand(policyParams);
-      await s3Client.send(policyCommand);
-      console.log("Bucket policy set successfully");
-    } catch (policyError) {
-      console.warn("Could not set bucket policy:", policyError);
-      // Continue even if policy setting fails
-    }
     
     // Store the bucket information in Supabase
     const { error } = await supabase
@@ -85,7 +85,8 @@ export const createUserBucket = async (userId: string): Promise<string | null> =
     
     if (error) {
       console.error("Error storing bucket info in Supabase:", error);
-      throw error;
+      // Continue despite database error, as bucket was created successfully
+      console.log("Continuing despite database error, as bucket was created successfully");
     }
     
     return bucketName;
@@ -97,24 +98,6 @@ export const createUserBucket = async (userId: string): Promise<string | null> =
       console.error("Error stack:", error.stack);
     }
     return null;
-  }
-};
-
-/**
- * Checks if a bucket exists
- * @param bucketName - The name of the bucket to check
- * @returns Boolean indicating if the bucket exists
- */
-const bucketExists = async (bucketName: string): Promise<boolean> => {
-  try {
-    const command = new HeadBucketCommand({ Bucket: bucketName });
-    await s3Client.send(command);
-    return true;
-  } catch (error) {
-    // If error code is 404, bucket does not exist
-    // If error code is 403, bucket exists but you don't have access
-    // For our purposes, if we can't access it, we need to create a new one
-    return false;
   }
 };
 
@@ -131,6 +114,7 @@ const ensureUserDirectoryExists = async (bucketName: string, userId: string): Pr
       Bucket: bucketName,
       Key: `users/${userId}/`,
       Body: '', // Empty body to simulate a directory
+      ACL: 'private', // Ensure private ACL for data confidentiality
     });
     
     await s3Client.send(command);
@@ -154,7 +138,7 @@ export const generateUploadUrl = async (
   fileType: string,
   userId: string,
   expirationSeconds: number = 600
-): Promise<{ uploadUrl: string; fileKey: string; message?: string }> => {
+): Promise<{ uploadUrl: string; fileKey: string; message?: string; bucketName?: string }> => {
   try {
     // Get the bucket for this user
     const { data: credentials, error } = await supabase
@@ -170,10 +154,11 @@ export const generateUploadUrl = async (
     // If no bucket is found for this user, create one
     if (error || !credentials?.bucket_name) {
       console.log("No bucket found for user, creating new bucket");
-      bucketName = await createUserBucket(userId) as string;
-      if (!bucketName) {
+      const newBucketName = await createUserBucket(userId) as string;
+      if (!newBucketName) {
         throw new Error("Failed to create storage bucket for user");
       }
+      bucketName = newBucketName;
       bucketCreated = true;
       message = "Bucket created and upload URL generated";
     } else {
@@ -183,10 +168,11 @@ export const generateUploadUrl = async (
       const exists = await bucketExists(bucketName);
       if (!exists) {
         console.log(`Bucket ${bucketName} does not exist, creating it`);
-        bucketName = await createUserBucket(userId) as string;
-        if (!bucketName) {
+        const newBucketName = await createUserBucket(userId) as string;
+        if (!newBucketName) {
           throw new Error("Failed to create storage bucket for user");
         }
+        bucketName = newBucketName;
         bucketCreated = true;
         message = "Bucket recreated and upload URL generated";
       }
@@ -198,14 +184,14 @@ export const generateUploadUrl = async (
     // Create a unique file key with timestamp
     const timestamp = Date.now();
     const safeFileName = fileName.replace(/[^a-zA-Z0-9._-]/g, '_');
-    const fileKey = `users/${userId}/${timestamp}-${safeFileName}`;
+    const fileKey = `users/${userId}/${timestamp}_${safeFileName}`;
     
     // Create the command for putting an object to S3
     const command = new PutObjectCommand({
       Bucket: bucketName,
       Key: fileKey,
       ContentType: fileType,
-      ACL: 'private'
+      ACL: 'private' // Ensure private ACL for data confidentiality
     });
     
     // Generate the signed URL
@@ -214,7 +200,8 @@ export const generateUploadUrl = async (
     return {
       uploadUrl,
       fileKey,
-      message: bucketCreated ? message : undefined
+      message: bucketCreated ? message : undefined,
+      bucketName: bucketName
     };
   } catch (error) {
     console.error("Error generating upload URL:", error);
