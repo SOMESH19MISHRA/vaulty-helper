@@ -27,6 +27,7 @@ const FileUpload: React.FC<FileUploadProps> = ({ userId, onUploadSuccess }) => {
     
     try {
       setIsUploading(true);
+      toast.loading('Uploading file...');
       
       // 1. Generate a pre-signed URL for direct upload to S3
       const { uploadUrl, fileKey } = await generateUploadUrl(
@@ -39,16 +40,16 @@ const FileUpload: React.FC<FileUploadProps> = ({ userId, onUploadSuccess }) => {
       await uploadFileWithPresignedUrl(file, uploadUrl, file.type);
       
       // 3. Store a reference to the file in Supabase
-      const { error } = await storeFileReference(userId, fileKey, file.name, file.type, file.size);
+      await storeFileReference(userId, fileKey, file.name, file.type, file.size);
       
-      if (error) throw error;
-      
-      toast.success('File uploaded successfully to S3');
+      toast.dismiss();
+      toast.success('File uploaded successfully');
       onUploadSuccess();
       e.target.value = '';
     } catch (error: any) {
       console.error('Error uploading file:', error);
-      toast.error('Failed to upload file');
+      toast.dismiss();
+      toast.error('Failed to upload file: ' + (error.message || 'Unknown error'));
     } finally {
       setIsUploading(false);
     }
@@ -62,7 +63,7 @@ const FileUpload: React.FC<FileUploadProps> = ({ userId, onUploadSuccess }) => {
     fileType: string, 
     fileSize: number
   ) => {
-    const { data, error } = await fetch('/api/store-file-reference', {
+    const response = await fetch('/api/store-file-reference', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -74,9 +75,14 @@ const FileUpload: React.FC<FileUploadProps> = ({ userId, onUploadSuccess }) => {
         fileType,
         fileSize
       }),
-    }).then(res => res.json());
+    });
     
-    return { data, error };
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || 'Failed to store file reference');
+    }
+    
+    return response.json();
   };
 
   return (

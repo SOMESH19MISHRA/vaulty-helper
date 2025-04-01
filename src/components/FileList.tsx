@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Download, Trash2, FileIcon } from 'lucide-react';
@@ -39,7 +38,6 @@ const FileList: React.FC<FileListProps> = ({ files, isLoading, userId, onFileDel
       a.download = fileName;
       document.body.appendChild(a);
       a.click();
-      URL.revokeObjectURL(downloadUrl);
       document.body.removeChild(a);
       
       toast.dismiss();

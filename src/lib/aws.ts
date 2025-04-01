@@ -132,7 +132,7 @@ export const generateUploadUrl = async (
     // Create a unique file key with timestamp
     const timestamp = Date.now();
     const safeFileName = fileName.replace(/[^a-zA-Z0-9._-]/g, '_');
-    const fileKey = `users/${userId}/${timestamp}_${safeFileName}`;
+    const fileKey = `users/${userId}/${timestamp}-${safeFileName}`;
     
     // Create the command for putting an object to S3
     const command = new PutObjectCommand({
@@ -185,7 +185,7 @@ export const uploadFileWithPresignedUrl = async (
       message: 'File uploaded successfully'
     };
   } catch (error) {
-    console.error("Error uploading file:", error);
+    console.error("Error uploading file with error:", error);
     throw error;
   }
 };
