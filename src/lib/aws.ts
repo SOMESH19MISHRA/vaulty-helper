@@ -1,4 +1,4 @@
-import { S3Client, CreateBucketCommand, CreateBucketCommandInput, PutBucketPolicyCommand, PutObjectCommand, DeleteObjectCommand, ListObjectsV2Command } from "@aws-sdk/client-s3";
+import { S3Client, CreateBucketCommand, CreateBucketCommandInput, PutBucketPolicyCommand, PutObjectCommand, DeleteObjectCommand, ListObjectsV2Command, HeadBucketCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { AWS_REGION, AWS_ACCESS_KEY, AWS_SECRET_KEY } from "./supabase";
 import { supabase } from "./supabase";
@@ -101,19 +101,60 @@ export const createUserBucket = async (userId: string): Promise<string | null> =
 };
 
 /**
+ * Checks if a bucket exists
+ * @param bucketName - The name of the bucket to check
+ * @returns Boolean indicating if the bucket exists
+ */
+const bucketExists = async (bucketName: string): Promise<boolean> => {
+  try {
+    const command = new HeadBucketCommand({ Bucket: bucketName });
+    await s3Client.send(command);
+    return true;
+  } catch (error) {
+    // If error code is 404, bucket does not exist
+    // If error code is 403, bucket exists but you don't have access
+    // For our purposes, if we can't access it, we need to create a new one
+    return false;
+  }
+};
+
+/**
+ * Ensures the user's directory exists in the bucket
+ * Note: S3 doesn't have real directories, but we can create an empty object with the directory path
+ * @param bucketName - The bucket to check
+ * @param userId - The user ID for the directory
+ */
+const ensureUserDirectoryExists = async (bucketName: string, userId: string): Promise<void> => {
+  try {
+    // Create an empty object with the directory prefix to simulate a directory
+    const command = new PutObjectCommand({
+      Bucket: bucketName,
+      Key: `users/${userId}/`,
+      Body: '', // Empty body to simulate a directory
+    });
+    
+    await s3Client.send(command);
+    console.log(`Directory users/${userId}/ created or verified`);
+  } catch (error) {
+    console.error("Error ensuring user directory exists:", error);
+    throw error;
+  }
+};
+
+/**
  * Generates a pre-signed URL for uploading a file to S3
  * @param fileName - Original file name
  * @param fileType - MIME type of the file
  * @param userId - User ID for storing the file under their directory
  * @param expirationSeconds - URL expiration time in seconds (default: 600 seconds = 10 minutes)
- * @returns Object containing uploadUrl and fileKey
+ * @returns Object containing uploadUrl, fileKey, and status message
  */
 export const generateUploadUrl = async (
   fileName: string,
   fileType: string,
   userId: string,
   expirationSeconds: number = 600
-): Promise<{ uploadUrl: string; fileKey: string }> => {
+): Promise<{ uploadUrl: string; fileKey: string; message?: string }> => {
   try {
     // Get the bucket for this user
     const { data: credentials, error } = await supabase
@@ -122,12 +163,37 @@ export const generateUploadUrl = async (
       .eq('user_id', userId)
       .single();
     
+    let bucketName: string;
+    let message: string = "Upload URL generated";
+    let bucketCreated: boolean = false;
+    
+    // If no bucket is found for this user, create one
     if (error || !credentials?.bucket_name) {
-      console.error("Error fetching user bucket:", error);
-      throw new Error("Could not find storage bucket for user");
+      console.log("No bucket found for user, creating new bucket");
+      bucketName = await createUserBucket(userId) as string;
+      if (!bucketName) {
+        throw new Error("Failed to create storage bucket for user");
+      }
+      bucketCreated = true;
+      message = "Bucket created and upload URL generated";
+    } else {
+      bucketName = credentials.bucket_name;
+      
+      // Check if the bucket exists, if not create it
+      const exists = await bucketExists(bucketName);
+      if (!exists) {
+        console.log(`Bucket ${bucketName} does not exist, creating it`);
+        bucketName = await createUserBucket(userId) as string;
+        if (!bucketName) {
+          throw new Error("Failed to create storage bucket for user");
+        }
+        bucketCreated = true;
+        message = "Bucket recreated and upload URL generated";
+      }
     }
     
-    const bucketName = credentials.bucket_name;
+    // Ensure the user directory exists in the bucket
+    await ensureUserDirectoryExists(bucketName, userId);
     
     // Create a unique file key with timestamp
     const timestamp = Date.now();
@@ -147,7 +213,8 @@ export const generateUploadUrl = async (
     
     return {
       uploadUrl,
-      fileKey
+      fileKey,
+      message: bucketCreated ? message : undefined
     };
   } catch (error) {
     console.error("Error generating upload URL:", error);

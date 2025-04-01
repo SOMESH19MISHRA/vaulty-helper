@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Upload } from 'lucide-react';
@@ -30,7 +29,7 @@ const FileUpload: React.FC<FileUploadProps> = ({ userId, onUploadSuccess }) => {
       toast.loading('Uploading file...');
       
       // 1. Generate a pre-signed URL for direct upload to S3
-      const { uploadUrl, fileKey } = await generateUploadUrl(
+      const { uploadUrl, fileKey, message } = await generateUploadUrl(
         file.name,
         file.type,
         userId
@@ -43,7 +42,14 @@ const FileUpload: React.FC<FileUploadProps> = ({ userId, onUploadSuccess }) => {
       await storeFileReference(userId, fileKey, file.name, file.type, file.size);
       
       toast.dismiss();
-      toast.success('File uploaded successfully');
+      
+      // Show appropriate success message based on whether bucket was created
+      if (message) {
+        toast.success(message);
+      } else {
+        toast.success('File uploaded successfully');
+      }
+      
       onUploadSuccess();
       e.target.value = '';
     } catch (error: any) {
