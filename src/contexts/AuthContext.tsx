@@ -1,3 +1,4 @@
+
 import React, { createContext, useState, useEffect, useContext } from 'react';
 import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
@@ -12,6 +13,7 @@ interface AuthContextProps {
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
+  authError: string | null;
 }
 
 const AuthContext = createContext<AuthContextProps | undefined>(undefined);
@@ -20,9 +22,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [authError, setAuthError] = useState<string | null>(null);
   const navigate = useNavigate();
 
   useEffect(() => {
+    // Clear any previous errors when component mounts
+    setAuthError(null);
+
+    // Setup auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (_event, session) => {
         setSession(session);
@@ -31,11 +38,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     );
 
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      setLoading(false);
-    });
+    // Initial session fetch
+    const getInitialSession = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        setSession(session);
+        setUser(session?.user ?? null);
+      } catch (error) {
+        console.error("Error fetching initial session:", error);
+        setAuthError("Failed to connect to authentication service. Please check your internet connection.");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    getInitialSession();
 
     return () => subscription.unsubscribe();
   }, []);
@@ -43,7 +60,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const signUp = async (email: string, password: string) => {
     try {
       setLoading(true);
+      setAuthError(null);
       console.log("Attempting to sign up with:", email);
+      
+      // Check internet connection before proceeding
+      if (!navigator.onLine) {
+        throw new Error("No internet connection. Please check your network and try again.");
+      }
       
       const { data, error } = await supabase.auth.signUp({
         email,
@@ -111,12 +134,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } catch (error: any) {
       console.error("Registration error:", error);
       
-      // Handle network errors
-      if (error.message === 'Failed to fetch') {
-        toast.error("Network error. Please check your internet connection and try again.");
-      } else {
-        toast.error(error.error_description || error.message || "An error occurred during sign up");
+      let errorMessage = "An error occurred during sign up";
+      
+      // Handle network errors with more specific messages
+      if (error.message === 'Failed to fetch' || error.code === 20 || error.code === 'NETWORK_ERROR') {
+        errorMessage = "Network error. Please check your internet connection and try again.";
+      } else if (error.message) {
+        errorMessage = error.message;
+      } else if (error.error_description) {
+        errorMessage = error.error_description;
       }
+      
+      setAuthError(errorMessage);
+      toast.error(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -125,7 +155,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const signIn = async (email: string, password: string) => {
     try {
       setLoading(true);
+      setAuthError(null);
       console.log("Attempting to sign in with:", email);
+      
+      // Check internet connection before proceeding
+      if (!navigator.onLine) {
+        throw new Error("No internet connection. Please check your network and try again.");
+      }
       
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
@@ -144,12 +180,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } catch (error: any) {
       console.error("Login error:", error);
       
-      // Handle network errors
-      if (error.message === 'Failed to fetch') {
-        toast.error("Network error. Please check your internet connection and try again.");
-      } else {
-        toast.error(error.error_description || error.message || "Invalid login credentials");
+      let errorMessage = "Invalid login credentials";
+      
+      // Handle network errors with more specific messages
+      if (error.message === 'Failed to fetch' || error.code === 20 || error.code === 'NETWORK_ERROR') {
+        errorMessage = "Network error. Please check your internet connection and try again.";
+      } else if (error.message) {
+        errorMessage = error.message;
+      } else if (error.error_description) {
+        errorMessage = error.error_description;
       }
+      
+      setAuthError(errorMessage);
+      toast.error(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -158,12 +201,30 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const signOut = async () => {
     try {
       setLoading(true);
+      setAuthError(null);
+      
+      // Check internet connection before proceeding
+      if (!navigator.onLine) {
+        throw new Error("No internet connection. Please check your network and try again.");
+      }
+      
       const { error } = await supabase.auth.signOut();
       if (error) throw error;
       toast.success("Signed out successfully");
       navigate('/');
     } catch (error: any) {
-      toast.error(error.error_description || error.message || "Error signing out");
+      let errorMessage = "Error signing out";
+      
+      if (error.message === 'Failed to fetch' || error.code === 20 || error.code === 'NETWORK_ERROR') {
+        errorMessage = "Network error. Please check your internet connection and try again.";
+      } else if (error.message) {
+        errorMessage = error.message;
+      } else if (error.error_description) {
+        errorMessage = error.error_description;
+      }
+      
+      setAuthError(errorMessage);
+      toast.error(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -178,6 +239,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         signIn,
         signUp,
         signOut,
+        authError,
       }}
     >
       {children}

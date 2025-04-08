@@ -1,11 +1,13 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Eye, EyeOff, Mail, Lock } from 'lucide-react';
+import { Eye, EyeOff, Mail, Lock, AlertTriangle, Wifi, WifiOff } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 
 interface AuthFormProps {
   isLogin: boolean;
@@ -18,10 +20,32 @@ const AuthForm: React.FC<AuthFormProps> = ({ isLogin, onSubmit, loading }) => {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [formError, setFormError] = useState('');
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const { authError } = useAuth();
+
+  // Monitor online status
+  useEffect(() => {
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setFormError('');
+    
+    // Check if online first
+    if (!isOnline) {
+      setFormError('You are offline. Please check your internet connection and try again.');
+      return;
+    }
     
     if (!email || !password) {
       setFormError('Please fill in all fields');
@@ -44,9 +68,12 @@ const AuthForm: React.FC<AuthFormProps> = ({ isLogin, onSubmit, loading }) => {
     try {
       await onSubmit(email, password);
     } catch (error: any) {
-      setFormError(error.message || 'An error occurred');
+      // Error handling is now done in AuthContext
+      // This try/catch is just a fallback
     }
   };
+
+  const displayError = formError || authError;
 
   return (
     <div className="flex justify-center items-center w-full animate-fade-in">
@@ -60,6 +87,15 @@ const AuthForm: React.FC<AuthFormProps> = ({ isLogin, onSubmit, loading }) => {
               ? 'Enter your credentials to access your account' 
               : 'Fill in your details to create your account'}
           </CardDescription>
+          
+          {!isOnline && (
+            <Alert variant="destructive" className="mt-4 bg-destructive/10 border-destructive">
+              <WifiOff className="h-4 w-4 mr-2" />
+              <AlertDescription>
+                You are currently offline. Please check your internet connection.
+              </AlertDescription>
+            </Alert>
+          )}
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-6">
@@ -107,15 +143,18 @@ const AuthForm: React.FC<AuthFormProps> = ({ isLogin, onSubmit, loading }) => {
                   {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                 </button>
               </div>
-              {formError && (
-                <p className="text-destructive text-sm mt-2 animate-fade-in">{formError}</p>
+              {displayError && (
+                <Alert variant="destructive" className="mt-2 py-2 bg-destructive/10 border-destructive">
+                  <AlertTriangle className="h-4 w-4 mr-2" />
+                  <AlertDescription className="text-sm">{displayError}</AlertDescription>
+                </Alert>
               )}
             </div>
             
             <Button
               type="submit"
               className="w-full h-12 rounded-xl bg-cloud hover:bg-cloud-light transition-all duration-300 font-medium"
-              disabled={loading}
+              disabled={loading || !isOnline}
             >
               {loading ? (
                 <div className="flex items-center justify-center">
@@ -123,7 +162,14 @@ const AuthForm: React.FC<AuthFormProps> = ({ isLogin, onSubmit, loading }) => {
                   {isLogin ? 'Signing in...' : 'Creating account...'}
                 </div>
               ) : (
-                <span>{isLogin ? 'Sign in' : 'Create account'}</span>
+                <div className="flex items-center justify-center">
+                  {isOnline ? (
+                    <Wifi className="h-4 w-4 mr-2 opacity-75" />
+                  ) : (
+                    <WifiOff className="h-4 w-4 mr-2 opacity-75" />
+                  )}
+                  <span>{isLogin ? 'Sign in' : 'Create account'}</span>
+                </div>
               )}
             </Button>
           </form>
