@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Upload } from 'lucide-react';
 import { toast } from 'sonner';
-import { generateUploadUrl, uploadFileWithPresignedUrl } from '@/lib/aws';
+import { supabase } from '@/lib/supabase';
 
 interface FileUploadProps {
   userId: string;
@@ -19,7 +19,7 @@ const FileUpload: React.FC<FileUploadProps> = ({ userId, onUploadSuccess }) => {
     
     const file = files[0];
     
-    // Increase file size limit to 50MB (from 5MB)
+    // Size limit of 50MB
     if (file.size > 50 * 1024 * 1024) {
       toast.error('File size exceeds 50MB limit');
       return;
@@ -29,29 +29,24 @@ const FileUpload: React.FC<FileUploadProps> = ({ userId, onUploadSuccess }) => {
       setIsUploading(true);
       toast.loading('Uploading file...');
       
-      // 1. Generate a pre-signed URL for direct upload to S3
-      const { uploadUrl, fileKey, message, bucketName } = await generateUploadUrl(
-        file.name,
-        file.type,
-        userId
-      );
+      // Create the file path with userId and timestamp
+      const filePath = `${userId}/${Date.now()}_${file.name}`;
       
-      console.log(`Upload URL generated for bucket: ${bucketName}`);
+      // Upload file directly to Supabase storage
+      const { data, error } = await supabase.storage
+        .from('cloudvault')
+        .upload(filePath, file);
       
-      // 2. Upload the file directly to S3 using the pre-signed URL
-      await uploadFileWithPresignedUrl(file, uploadUrl, file.type);
-      
-      // 3. Store a reference to the file in Supabase
-      await storeFileReference(userId, fileKey, file.name, file.type, file.size);
-      
-      toast.dismiss();
-      
-      // Show appropriate success message based on whether bucket was created
-      if (message) {
-        toast.success(message);
-      } else {
-        toast.success('File uploaded successfully');
+      if (error) {
+        console.error('Upload failed:', error);
+        toast.dismiss();
+        toast.error(`Failed to upload file: ${error.message}`);
+        return;
       }
+      
+      console.log('File uploaded:', data.path);
+      toast.dismiss();
+      toast.success('File uploaded successfully');
       
       onUploadSuccess();
       e.target.value = '';
@@ -62,36 +57,6 @@ const FileUpload: React.FC<FileUploadProps> = ({ userId, onUploadSuccess }) => {
     } finally {
       setIsUploading(false);
     }
-  };
-  
-  // Helper function to store file metadata in Supabase
-  const storeFileReference = async (
-    userId: string, 
-    fileKey: string, 
-    fileName: string, 
-    fileType: string, 
-    fileSize: number
-  ) => {
-    const response = await fetch('/api/store-file-reference', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        userId,
-        fileKey,
-        fileName,
-        fileType,
-        fileSize
-      }),
-    });
-    
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.error || 'Failed to store file reference');
-    }
-    
-    return response.json();
   };
 
   return (
