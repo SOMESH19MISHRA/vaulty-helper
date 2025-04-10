@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Download, Trash, File } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { Button } from '@/components/ui/button';
@@ -25,7 +25,7 @@ const FileListSupabase: React.FC<FileListSupabaseProps> = ({ userId, onFileDelet
   const [loading, setLoading] = useState(isLoading);
   
   // Fetch the files on component mount
-  React.useEffect(() => {
+  useEffect(() => {
     fetchFiles();
   }, [userId]);
   
@@ -53,31 +53,53 @@ const FileListSupabase: React.FC<FileListSupabaseProps> = ({ userId, onFileDelet
     }
   };
   
-  const downloadFile = async (fileName: string) => {
+  const getSignedUrl = async (filePath: string) => {
     try {
-      const filePath = `${userId}/${fileName}`;
-      
       const { data, error } = await supabase
         .storage
         .from('cloudvault')
-        .download(filePath);
+        .createSignedUrl(filePath, 60); // Expires in 60 seconds
         
       if (error) {
-        throw error;
+        console.error('Failed to generate signed URL:', error.message);
+        toast.error('Failed to generate download link');
+        return null;
       }
       
-      // Create a download link
-      const url = URL.createObjectURL(data);
+      return data.signedUrl;
+    } catch (error: any) {
+      console.error('Error creating signed URL:', error);
+      toast.error('Failed to generate download link');
+      return null;
+    }
+  };
+  
+  const downloadFile = async (fileName: string) => {
+    try {
+      const filePath = `${userId}/${fileName}`;
+      toast.loading('Preparing download...');
+      
+      // Get signed URL for download
+      const signedUrl = await getSignedUrl(filePath);
+      
+      if (!signedUrl) {
+        toast.dismiss();
+        return;
+      }
+      
+      // Create a download link and trigger download
       const link = document.createElement('a');
-      link.href = url;
+      link.href = signedUrl;
       link.download = fileName.split('_').slice(1).join('_'); // Remove timestamp from filename
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-      URL.revokeObjectURL(url);
       
+      toast.dismiss();
+      toast.success('Download started');
     } catch (error: any) {
       console.error('Error downloading file:', error);
+      toast.dismiss();
       toast.error(`Failed to download file: ${error.message}`);
     }
   };

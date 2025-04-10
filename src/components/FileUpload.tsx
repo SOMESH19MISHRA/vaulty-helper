@@ -38,22 +38,24 @@ const FileUpload: React.FC<FileUploadProps> = ({ userId, onUploadSuccess }) => {
         .upload(filePath, file);
       
       if (error) {
-        console.error('Upload failed:', error);
+        console.error('Failed to upload file:', error.message);
         toast.dismiss();
         toast.error(`Failed to upload file: ${error.message}`);
-        return;
+        return null;
       }
       
-      console.log('File uploaded:', data.path);
+      console.log('Uploaded file path:', data.path);
       toast.dismiss();
       toast.success('File uploaded successfully');
       
       onUploadSuccess();
       e.target.value = '';
+      return data.path;
     } catch (error: any) {
       console.error('Error uploading file:', error);
       toast.dismiss();
       toast.error('Failed to upload file: ' + (error.message || 'Unknown error'));
+      return null;
     } finally {
       setIsUploading(false);
     }
