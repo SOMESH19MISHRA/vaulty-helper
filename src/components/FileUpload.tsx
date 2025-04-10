@@ -27,30 +27,30 @@ const FileUpload: React.FC<FileUploadProps> = ({ userId, onUploadSuccess }) => {
     
     try {
       setIsUploading(true);
-      toast.loading('Uploading file...');
+      const toastId = toast.loading('Uploading file...');
       
       // Create the file path with userId and timestamp
       const filePath = `${userId}/${Date.now()}_${file.name}`;
       
       // Upload file directly to Supabase storage
-      const { data, error } = await supabase.storage
+      let { error } = await supabase.storage
         .from('cloudvault')
         .upload(filePath, file);
       
       if (error) {
         console.error('Failed to upload file:', error.message);
-        toast.dismiss();
+        toast.dismiss(toastId);
         toast.error(`Failed to upload file: ${error.message}`);
         return null;
       }
       
-      console.log('Uploaded file path:', data.path);
-      toast.dismiss();
+      console.log('File uploaded successfully to path:', filePath);
+      toast.dismiss(toastId);
       toast.success('File uploaded successfully');
       
       onUploadSuccess();
       e.target.value = '';
-      return data.path;
+      return filePath;
     } catch (error: any) {
       console.error('Error uploading file:', error);
       toast.dismiss();

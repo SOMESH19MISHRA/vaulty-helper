@@ -77,13 +77,13 @@ const FileListSupabase: React.FC<FileListSupabaseProps> = ({ userId, onFileDelet
   const downloadFile = async (fileName: string) => {
     try {
       const filePath = `${userId}/${fileName}`;
-      toast.loading('Preparing download...');
+      const toastId = toast.loading('Preparing download...');
       
       // Get signed URL for download
       const signedUrl = await getSignedUrl(filePath);
       
       if (!signedUrl) {
-        toast.dismiss();
+        toast.dismiss(toastId);
         return;
       }
       
@@ -95,7 +95,7 @@ const FileListSupabase: React.FC<FileListSupabaseProps> = ({ userId, onFileDelet
       link.click();
       document.body.removeChild(link);
       
-      toast.dismiss();
+      toast.dismiss(toastId);
       toast.success('Download started');
     } catch (error: any) {
       console.error('Error downloading file:', error);
@@ -107,6 +107,7 @@ const FileListSupabase: React.FC<FileListSupabaseProps> = ({ userId, onFileDelet
   const deleteFile = async (fileName: string) => {
     try {
       const filePath = `${userId}/${fileName}`;
+      const toastId = toast.loading('Deleting file...');
       
       const { error } = await supabase
         .storage
@@ -114,9 +115,12 @@ const FileListSupabase: React.FC<FileListSupabaseProps> = ({ userId, onFileDelet
         .remove([filePath]);
         
       if (error) {
-        throw error;
+        toast.dismiss(toastId);
+        toast.error(`Failed to delete file: ${error.message}`);
+        return;
       }
       
+      toast.dismiss(toastId);
       toast.success('File deleted successfully');
       onFileDeleted();
       fetchFiles(); // Refresh the list
