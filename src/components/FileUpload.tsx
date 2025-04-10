@@ -32,30 +32,50 @@ const FileUpload: React.FC<FileUploadProps> = ({ userId, onUploadSuccess }) => {
       // Create the file path with userId and timestamp
       const filePath = `${userId}/${Date.now()}_${file.name}`;
       
-      // Upload file directly to Supabase storage
-      // Using the safe pattern without destructuring
-      const uploadResponse = await supabase.storage
-        .from('cloudvault')
-        .upload(filePath, file);
+      // Upload file directly to Supabase storage with improved error handling
+      let uploadResult = null;
       
-      if (uploadResponse.error) {
-        console.error('Failed to upload file:', uploadResponse.error.message);
+      try {
+        const uploadResponse = await supabase.storage
+          .from('cloudvault')
+          .upload(filePath, file);
+        
+        if (uploadResponse.error) {
+          console.error('Upload error details:', uploadResponse.error);
+          // Check for RLS policy violation
+          if (uploadResponse.error.message?.includes('violates row-level security policy')) {
+            toast.dismiss(toastId);
+            toast.error('Permission denied: Storage bucket access restricted');
+            return null;
+          }
+          
+          toast.dismiss(toastId);
+          toast.error(`Failed to upload file: ${uploadResponse.error.message}`);
+          return null;
+        }
+        
+        uploadResult = filePath;
+      } catch (uploadError: any) {
+        console.error('Exception during upload:', uploadError);
         toast.dismiss(toastId);
-        toast.error(`Failed to upload file: ${uploadResponse.error.message}`);
+        toast.error(`Upload exception: ${uploadError.message || 'Unknown error'}`);
         return null;
       }
       
-      console.log('File uploaded successfully to path:', filePath);
-      toast.dismiss(toastId);
-      toast.success('File uploaded successfully');
+      if (uploadResult) {
+        console.log('File uploaded successfully to path:', uploadResult);
+        toast.dismiss(toastId);
+        toast.success('File uploaded successfully');
+        
+        onUploadSuccess();
+        e.target.value = '';
+      }
       
-      onUploadSuccess();
-      e.target.value = '';
-      return filePath;
+      return uploadResult;
     } catch (error: any) {
-      console.error('Error uploading file:', error);
+      console.error('Error in upload process:', error);
       toast.dismiss();
-      toast.error('Failed to upload file: ' + (error.message || 'Unknown error'));
+      toast.error('Upload process error: ' + (error.message || 'Unknown error'));
       return null;
     } finally {
       setIsUploading(false);
