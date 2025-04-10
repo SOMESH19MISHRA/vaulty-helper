@@ -33,18 +33,18 @@ const FileListSupabase: React.FC<FileListSupabaseProps> = ({ userId, onFileDelet
     try {
       setLoading(true);
       
-      const { data, error } = await supabase
+      const listResponse = await supabase
         .storage
         .from('cloudvault')
         .list(userId + '/');
       
-      if (error) {
-        console.error('Error listing files:', error);
+      if (listResponse.error) {
+        console.error('Error listing files:', listResponse.error);
         toast.error('Failed to load files');
         return;
       }
       
-      setFiles(data || []);
+      setFiles(listResponse.data || []);
     } catch (error: any) {
       console.error('Error fetching files:', error);
       toast.error('Failed to load files');
@@ -55,18 +55,18 @@ const FileListSupabase: React.FC<FileListSupabaseProps> = ({ userId, onFileDelet
   
   const getSignedUrl = async (filePath: string) => {
     try {
-      const { data, error } = await supabase
+      const urlResponse = await supabase
         .storage
         .from('cloudvault')
         .createSignedUrl(filePath, 60); // Expires in 60 seconds
         
-      if (error) {
-        console.error('Failed to generate signed URL:', error.message);
+      if (urlResponse.error) {
+        console.error('Failed to generate signed URL:', urlResponse.error.message);
         toast.error('Failed to generate download link');
         return null;
       }
       
-      return data.signedUrl;
+      return urlResponse.data.signedUrl;
     } catch (error: any) {
       console.error('Error creating signed URL:', error);
       toast.error('Failed to generate download link');
@@ -109,14 +109,14 @@ const FileListSupabase: React.FC<FileListSupabaseProps> = ({ userId, onFileDelet
       const filePath = `${userId}/${fileName}`;
       const toastId = toast.loading('Deleting file...');
       
-      const { error } = await supabase
+      const deleteResponse = await supabase
         .storage
         .from('cloudvault')
         .remove([filePath]);
         
-      if (error) {
+      if (deleteResponse.error) {
         toast.dismiss(toastId);
-        toast.error(`Failed to delete file: ${error.message}`);
+        toast.error(`Failed to delete file: ${deleteResponse.error.message}`);
         return;
       }
       

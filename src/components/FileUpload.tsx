@@ -33,14 +33,15 @@ const FileUpload: React.FC<FileUploadProps> = ({ userId, onUploadSuccess }) => {
       const filePath = `${userId}/${Date.now()}_${file.name}`;
       
       // Upload file directly to Supabase storage
-      let { error } = await supabase.storage
+      // Using the safe pattern without destructuring
+      const uploadResponse = await supabase.storage
         .from('cloudvault')
         .upload(filePath, file);
       
-      if (error) {
-        console.error('Failed to upload file:', error.message);
+      if (uploadResponse.error) {
+        console.error('Failed to upload file:', uploadResponse.error.message);
         toast.dismiss(toastId);
-        toast.error(`Failed to upload file: ${error.message}`);
+        toast.error(`Failed to upload file: ${uploadResponse.error.message}`);
         return null;
       }
       
