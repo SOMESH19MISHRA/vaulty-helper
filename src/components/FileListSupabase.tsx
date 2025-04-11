@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Download, Trash, File, Edit2, Check, X } from 'lucide-react';
+import { Download, Trash, File, Edit2, Check, X, Eye } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
@@ -82,21 +82,29 @@ const FileListSupabase: React.FC<FileListSupabaseProps> = ({ userId, onFileDelet
       const filePath = `${userId}/${fileName}`;
       const toastId = toast.loading('Preparing download...');
       
-      // Get signed URL for download
-      const signedUrl = await getSignedUrl(filePath);
-      
-      if (!signedUrl) {
+      // Use direct download instead of signed URL
+      const downloadResponse = await supabase
+        .storage
+        .from('cloudvault')
+        .download(filePath);
+        
+      if (downloadResponse.error) {
         toast.dismiss(toastId);
+        toast.error(`Failed to download file: ${downloadResponse.error.message}`);
         return;
       }
       
       // Create a download link and trigger download
+      const url = window.URL.createObjectURL(downloadResponse.data);
       const link = document.createElement('a');
-      link.href = signedUrl;
+      link.href = url;
       link.download = fileName.split('_').slice(1).join('_'); // Remove timestamp from filename
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
+      
+      // Clean up the object URL
+      window.URL.revokeObjectURL(url);
       
       toast.dismiss(toastId);
       toast.success('Download started');
@@ -104,6 +112,29 @@ const FileListSupabase: React.FC<FileListSupabaseProps> = ({ userId, onFileDelet
       console.error('Error downloading file:', error);
       toast.dismiss();
       toast.error(`Failed to download file: ${error.message}`);
+    }
+  };
+  
+  const previewFile = async (fileName: string) => {
+    try {
+      const filePath = `${userId}/${fileName}`;
+      const toastId = toast.loading('Preparing preview...');
+      
+      // Get signed URL for preview
+      const signedUrl = await getSignedUrl(filePath);
+      
+      if (!signedUrl) {
+        toast.dismiss(toastId);
+        return;
+      }
+      
+      // Open in new tab
+      window.open(signedUrl, '_blank');
+      
+      toast.dismiss(toastId);
+    } catch (error: any) {
+      console.error('Error previewing file:', error);
+      toast.error(`Failed to preview file: ${error.message}`);
     }
   };
   
@@ -287,6 +318,14 @@ const FileListSupabase: React.FC<FileListSupabaseProps> = ({ userId, onFileDelet
                       title="Download"
                     >
                       <Download className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      onClick={() => previewFile(file.name)}
+                      title="Preview"
+                    >
+                      <Eye className="h-4 w-4" />
                     </Button>
                     <Button
                       size="icon"
