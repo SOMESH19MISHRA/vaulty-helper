@@ -1,9 +1,10 @@
 
 import React, { useState, useEffect } from 'react';
-import { Download, Trash, File } from 'lucide-react';
+import { Download, Trash, File, Edit2, Check, X } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
+import { Input } from '@/components/ui/input';
 
 interface FileListSupabaseProps {
   userId: string;
@@ -23,6 +24,8 @@ interface FileObject {
 const FileListSupabase: React.FC<FileListSupabaseProps> = ({ userId, onFileDeleted, isLoading }) => {
   const [files, setFiles] = useState<FileObject[]>([]);
   const [loading, setLoading] = useState(isLoading);
+  const [editingFile, setEditingFile] = useState<string | null>(null);
+  const [newFileName, setNewFileName] = useState('');
   
   // Fetch the files on component mount
   useEffect(() => {
@@ -130,6 +133,85 @@ const FileListSupabase: React.FC<FileListSupabaseProps> = ({ userId, onFileDelet
       toast.error(`Failed to delete file: ${error.message}`);
     }
   };
+
+  const startRenameFile = (fileName: string) => {
+    setEditingFile(fileName);
+    // Initialize with the original filename without the timestamp
+    setNewFileName(fileName.split('_').slice(1).join('_'));
+  };
+
+  const cancelRenameFile = () => {
+    setEditingFile(null);
+    setNewFileName('');
+  };
+
+  const renameFile = async (oldFileName: string) => {
+    try {
+      if (!newFileName.trim()) {
+        toast.error('Filename cannot be empty');
+        return;
+      }
+
+      const toastId = toast.loading('Renaming file...');
+      const oldPath = `${userId}/${oldFileName}`;
+      const timestamp = oldFileName.split('_')[0]; // Keep the original timestamp
+      const newPath = `${userId}/${timestamp}_${newFileName}`;
+
+      // Get the file data using a signed URL
+      const signedUrl = await getSignedUrl(oldPath);
+      if (!signedUrl) {
+        toast.dismiss(toastId);
+        toast.error('Failed to access file for renaming');
+        return;
+      }
+
+      // Download the file
+      const fileResponse = await fetch(signedUrl);
+      if (!fileResponse.ok) {
+        toast.dismiss(toastId);
+        toast.error('Failed to download file for renaming');
+        return;
+      }
+
+      const fileBlob = await fileResponse.blob();
+
+      // Upload to the new path
+      const uploadResponse = await supabase
+        .storage
+        .from('cloudvault')
+        .upload(newPath, fileBlob, {
+          upsert: true
+        });
+
+      if (uploadResponse.error) {
+        toast.dismiss(toastId);
+        toast.error(`Failed to upload with new name: ${uploadResponse.error.message}`);
+        return;
+      }
+
+      // Delete the old file
+      const deleteResponse = await supabase
+        .storage
+        .from('cloudvault')
+        .remove([oldPath]);
+
+      if (deleteResponse.error) {
+        toast.dismiss(toastId);
+        toast.error(`Failed to remove old file: ${deleteResponse.error.message}`);
+        // Note: At this point, the file exists in both locations
+        return;
+      }
+
+      toast.dismiss(toastId);
+      toast.success('File renamed successfully');
+      setEditingFile(null);
+      fetchFiles(); // Refresh the list
+    } catch (error: any) {
+      console.error('Error renaming file:', error);
+      toast.error(`Failed to rename file: ${error.message}`);
+      setEditingFile(null);
+    }
+  };
   
   if (loading) {
     return (
@@ -157,28 +239,74 @@ const FileListSupabase: React.FC<FileListSupabaseProps> = ({ userId, onFileDelet
           
           return (
             <li key={file.id} className="flex items-center justify-between p-2 bg-gray-50 rounded-md">
-              <div className="flex items-center space-x-2 overflow-hidden">
-                <File className="h-4 w-4 flex-shrink-0" />
-                <span className="truncate" title={originalName}>{originalName}</span>
-              </div>
+              {editingFile === file.name ? (
+                <div className="flex items-center space-x-2 flex-1 mr-2">
+                  <File className="h-4 w-4 flex-shrink-0" />
+                  <Input 
+                    value={newFileName}
+                    onChange={(e) => setNewFileName(e.target.value)}
+                    className="h-7 text-sm py-0"
+                    autoFocus
+                  />
+                </div>
+              ) : (
+                <div className="flex items-center space-x-2 overflow-hidden">
+                  <File className="h-4 w-4 flex-shrink-0" />
+                  <span className="truncate" title={originalName}>{originalName}</span>
+                </div>
+              )}
+              
               <div className="flex space-x-1">
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  onClick={() => downloadFile(file.name)}
-                  title="Download"
-                >
-                  <Download className="h-4 w-4" />
-                </Button>
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  onClick={() => deleteFile(file.name)}
-                  title="Delete"
-                  className="text-red-500 hover:text-red-700"
-                >
-                  <Trash className="h-4 w-4" />
-                </Button>
+                {editingFile === file.name ? (
+                  <>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      onClick={() => renameFile(file.name)}
+                      title="Save"
+                      className="text-green-500 hover:text-green-700"
+                    >
+                      <Check className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      onClick={cancelRenameFile}
+                      title="Cancel"
+                      className="text-gray-500 hover:text-gray-700"
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      onClick={() => downloadFile(file.name)}
+                      title="Download"
+                    >
+                      <Download className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      onClick={() => startRenameFile(file.name)}
+                      title="Rename"
+                    >
+                      <Edit2 className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      onClick={() => deleteFile(file.name)}
+                      title="Delete"
+                      className="text-red-500 hover:text-red-700"
+                    >
+                      <Trash className="h-4 w-4" />
+                    </Button>
+                  </>
+                )}
               </div>
             </li>
           );
