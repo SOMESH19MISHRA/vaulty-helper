@@ -5,12 +5,13 @@ import { useAuth } from '@/contexts/AuthContext';
 import NavBar from '@/components/NavBar';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import FileUpload from '@/components/FileUpload';
-import FileListSupabase from '@/components/FileListSupabase';
+import FilesList from '@/components/FilesList';
 import { toast } from 'sonner';
 import { supabase } from '@/lib/supabase';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { getUserStorageInfo } from '@/lib/aws';
 
 const Dashboard = () => {
   const { user, loading } = useAuth();
@@ -22,6 +23,8 @@ const Dashboard = () => {
   const [isUpdatingPassword, setIsUpdatingPassword] = useState(false);
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
+  const [isPremium, setIsPremium] = useState(false);
+  const [storageLimit, setStorageLimit] = useState(0);
 
   // Function to fetch file count and total size for the storage card
   const fetchFileDetails = async () => {
@@ -30,27 +33,34 @@ const Dashboard = () => {
     try {
       setIsLoading(true);
       
-      const { data, error } = await supabase
-        .storage
-        .from('cloudvault')
-        .list(user.id + '/');
+      // Get files metadata from Supabase
+      const { data: filesData, error } = await supabase
+        .from('files')
+        .select('*')
+        .eq('user_id', user.id);
       
       if (error) {
-        console.error('Error fetching file count:', error);
+        console.error('Error fetching files:', error);
         return;
       }
       
-      const count = data?.length || 0;
+      // Calculate count and total size
+      const count = filesData?.length || 0;
       setFileCount(count);
       
-      // Calculate total size of files
       let size = 0;
-      data?.forEach(file => {
-        size += file.metadata?.size || 0;
+      filesData?.forEach(file => {
+        size += file.size || 0;
       });
       setTotalSize(size);
+      
+      // Get user's storage info
+      const storageInfo = await getUserStorageInfo(user.id);
+      setIsPremium(storageInfo.isPremium);
+      setStorageLimit(storageInfo.storageLimit);
+      
     } catch (error: any) {
-      console.error('Error counting files:', error);
+      console.error('Error getting file details:', error);
     } finally {
       setIsLoading(false);
     }
@@ -160,7 +170,10 @@ const Dashboard = () => {
 
   const handleUploadSuccess = () => {
     fetchFileDetails();
-    // Toast notification is handled in the FileUpload component
+  };
+
+  const handleStorageUpdated = (newUsage: number) => {
+    setTotalSize(newUsage);
   };
 
   // Format size to human readable format
@@ -191,10 +204,10 @@ const Dashboard = () => {
               <CardContent>
                 <FileUpload userId={user.id} onUploadSuccess={handleUploadSuccess} />
                 <div className="mt-4">
-                  <FileListSupabase 
+                  <FilesList 
                     userId={user.id} 
-                    onFileDeleted={fetchFileDetails} 
-                    isLoading={isLoading} 
+                    onFileDeleted={fetchFileDetails}
+                    onStorageUpdated={handleStorageUpdated}
                   />
                 </div>
               </CardContent>
@@ -328,9 +341,14 @@ const Dashboard = () => {
                     <p className="text-2xl font-bold text-cloud">{formatSize(totalSize)}</p>
                     <p className="text-muted-foreground">total storage used</p>
                   </div>
-                  <p className="text-sm text-muted-foreground mt-2">
-                    Powered by Supabase Storage
-                  </p>
+                  <div className="text-center mt-2">
+                    <p className="text-sm text-muted-foreground">
+                      {formatSize(totalSize)} of {formatSize(storageLimit)} used
+                    </p>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      Powered by AWS S3
+                    </p>
+                  </div>
                 </div>
               </CardContent>
             </Card>
