@@ -30,7 +30,7 @@ export async function POST(req: Request) {
     const timestamp = Date.now();
     const sanitizedFilename = fileName.replace(/[^a-zA-Z0-9._-]/g, '_');
     
-    // Create a unique key for this file
+    // Create a unique key for this file using userId as prefix
     const key = `${userId}/${timestamp}-${sanitizedFilename}`;
     
     // Create the command for putting an object to S3
