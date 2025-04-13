@@ -3,43 +3,42 @@ import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { AWS_REGION, AWS_ACCESS_KEY, AWS_SECRET_KEY } from "@/lib/supabase";
 
-// Accessing AWS credentials (in a real Next.js app, these would come from .env.local)
-// But since we're using the existing credentials from the project:
-const region = "us-east-2"; // As per requirements
-const accessKey = AWS_ACCESS_KEY;
-const secretKey = AWS_SECRET_KEY;
-const bucket = "cloudvault-s3-uploads"; // Using a default bucket name (would come from .env in Next.js)
-
 // Initialize S3 client
 const s3Client = new S3Client({
-  region,
+  region: "us-east-2", // As specified in requirements
   credentials: {
-    accessKeyId: accessKey,
-    secretAccessKey: secretKey,
+    accessKeyId: AWS_ACCESS_KEY,
+    secretAccessKey: AWS_SECRET_KEY,
   },
 });
+
+const bucket = "cloudvault-s3-uploads"; // Your bucket name
 
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { fileName, fileType } = body;
+    const { fileName, fileType, userId } = body;
     
-    if (!fileName || !fileType) {
+    if (!fileName || !fileType || !userId) {
       return new Response(
-        JSON.stringify({ error: "Missing required fields: fileName and fileType" }),
+        JSON.stringify({ error: "Missing required fields: fileName, fileType, or userId" }),
         { status: 400, headers: { "Content-Type": "application/json" } }
       );
     }
 
+    // Generate sanitized filename
+    const timestamp = Date.now();
+    const sanitizedFilename = fileName.replace(/[^a-zA-Z0-9._-]/g, '_');
+    
     // Create a unique key for this file
-    const key = `uploads/${Date.now()}_${fileName}`;
+    const key = `${userId}/${timestamp}-${sanitizedFilename}`;
     
     // Create the command for putting an object to S3
     const command = new PutObjectCommand({
       Bucket: bucket,
       Key: key,
       ContentType: fileType,
-      ACL: "public-read", // As per requirements
+      ACL: "private", // Private as per requirements
     });
     
     // Generate the signed URL (expires in 60 seconds as required)
@@ -51,7 +50,7 @@ export async function POST(req: Request) {
         uploadUrl,
         key,
         bucket,
-        region,
+        region: "us-east-2"
       }),
       { status: 200, headers: { "Content-Type": "application/json" } }
     );
