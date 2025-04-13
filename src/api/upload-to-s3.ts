@@ -5,14 +5,14 @@ import { AWS_REGION, AWS_ACCESS_KEY, AWS_SECRET_KEY } from "@/lib/supabase";
 
 // Initialize S3 client
 const s3Client = new S3Client({
-  region: "us-east-2", // As specified in requirements
+  region: AWS_REGION, 
   credentials: {
     accessKeyId: AWS_ACCESS_KEY,
     secretAccessKey: AWS_SECRET_KEY,
   },
 });
 
-const bucket = "cloudvault-s3-uploads"; // Your bucket name
+const bucket = "cloudvault-userfiles"; // Updated bucket name
 
 export async function POST(req: Request) {
   try {
@@ -50,7 +50,7 @@ export async function POST(req: Request) {
         uploadUrl,
         key,
         bucket,
-        region: "us-east-2"
+        region: AWS_REGION
       }),
       { status: 200, headers: { "Content-Type": "application/json" } }
     );

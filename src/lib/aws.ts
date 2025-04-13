@@ -18,7 +18,7 @@ const s3Client = new S3Client({
   },
 });
 
-const DEFAULT_BUCKET = "cloudvault-s3-uploads";
+const DEFAULT_BUCKET = "cloudvault-userfiles";
 
 /**
  * Generates a pre-signed URL for downloading a file from S3
