@@ -10,13 +10,15 @@ export const PREMIUM_TIER_LIMIT = 10 * 1024 * 1024 * 1024; // 10GB in bytes
 export const MAX_FILE_SIZE_FREE = 50 * 1024 * 1024; // 50MB in bytes
 
 // Initialize S3 client
-const s3Client = new S3Client({
+export const s3Client = new S3Client({
   region: AWS_REGION,
   credentials: {
     accessKeyId: AWS_ACCESS_KEY,
     secretAccessKey: AWS_SECRET_KEY,
   },
 });
+
+console.log('AWS S3 client initialized with region:', AWS_REGION);
 
 const DEFAULT_BUCKET = "cloudvault-userfiles";
 
@@ -31,6 +33,8 @@ export const generateDownloadUrl = async (
   expirationSeconds: number = 3600
 ): Promise<{ downloadUrl: string }> => {
   try {
+    console.log(`Generating download URL for file: ${fileKey} in bucket: ${DEFAULT_BUCKET}`);
+    
     // Create the command for getting an object from S3
     const command = new GetObjectCommand({
       Bucket: DEFAULT_BUCKET,
@@ -39,6 +43,7 @@ export const generateDownloadUrl = async (
     
     // Generate the signed URL
     const downloadUrl = await getSignedUrl(s3Client, command, { expiresIn: expirationSeconds });
+    console.log('Generated download URL successfully');
     
     return { downloadUrl };
   } catch (error) {
@@ -54,6 +59,8 @@ export const generateDownloadUrl = async (
  */
 export const deleteFile = async (fileKey: string): Promise<{ message: string }> => {
   try {
+    console.log(`Deleting file: ${fileKey} from bucket: ${DEFAULT_BUCKET}`);
+    
     // Create the command for deleting an object from S3
     const command = new DeleteObjectCommand({
       Bucket: DEFAULT_BUCKET,
@@ -62,6 +69,7 @@ export const deleteFile = async (fileKey: string): Promise<{ message: string }> 
     
     // Execute the delete command
     await s3Client.send(command);
+    console.log('File deleted from S3 successfully');
     
     return { message: "File deleted successfully" };
   } catch (error) {
@@ -81,6 +89,8 @@ export const getUserStorageInfo = async (userId: string): Promise<{
   storageLimit: number;
 }> => {
   try {
+    console.log(`Getting storage info for user: ${userId}`);
+    
     // Get user's subscription tier
     const { data: userTier, error: tierError } = await supabase
       .from('subscriptions')
@@ -103,6 +113,7 @@ export const getUserStorageInfo = async (userId: string): Promise<{
     }
     
     const usedBytes = storageData?.total_bytes || 0;
+    console.log(`User storage info - Used: ${usedBytes}, Premium: ${isPremium}, Limit: ${storageLimit}`);
     
     return {
       usedBytes,

@@ -16,10 +16,25 @@ const bucket = "cloudvault-userfiles"; // Updated bucket name
 
 export async function POST(req: Request) {
   try {
+    console.log("[API] upload-to-s3: Request received");
+    
     const body = await req.json();
     const { fileName, fileType, userId } = body;
     
+    console.log("[API] upload-to-s3: Request parameters:", { 
+      fileName, 
+      fileType, 
+      userId,
+      bodyKeys: Object.keys(body)
+    });
+    
     if (!fileName || !fileType || !userId) {
+      console.error("[API] upload-to-s3: Missing required fields:", { 
+        hasFileName: !!fileName, 
+        hasFileType: !!fileType, 
+        hasUserId: !!userId 
+      });
+      
       return new Response(
         JSON.stringify({ error: "Missing required fields: fileName, fileType, or userId" }),
         { status: 400, headers: { "Content-Type": "application/json" } }
@@ -32,6 +47,7 @@ export async function POST(req: Request) {
     
     // Create a unique key for this file using userId as prefix
     const key = `${userId}/${timestamp}-${sanitizedFilename}`;
+    console.log("[API] upload-to-s3: Generated S3 key:", key);
     
     // Create the command for putting an object to S3
     const command = new PutObjectCommand({
@@ -41,8 +57,12 @@ export async function POST(req: Request) {
       ACL: "private", // Private as per requirements
     });
     
+    console.log("[API] upload-to-s3: Generating signed URL");
+    
     // Generate the signed URL (expires in 60 seconds as required)
     const uploadUrl = await getSignedUrl(s3Client, command, { expiresIn: 60 });
+    
+    console.log("[API] upload-to-s3: Generated signed URL successfully");
     
     // Return the signed URL and the file key
     return new Response(
@@ -55,9 +75,9 @@ export async function POST(req: Request) {
       { status: 200, headers: { "Content-Type": "application/json" } }
     );
   } catch (error) {
-    console.error("Error generating upload URL:", error);
+    console.error("[API] upload-to-s3: Error generating upload URL:", error);
     return new Response(
-      JSON.stringify({ error: "Failed to generate upload URL" }),
+      JSON.stringify({ error: "Failed to generate upload URL: " + (error instanceof Error ? error.message : String(error)) }),
       { status: 500, headers: { "Content-Type": "application/json" } }
     );
   }

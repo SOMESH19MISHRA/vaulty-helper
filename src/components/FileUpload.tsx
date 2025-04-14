@@ -29,8 +29,10 @@ const FileUpload: React.FC<FileUploadProps> = ({ userId, onUploadSuccess }) => {
     try {
       setIsUploading(true);
       const toastId = toast.loading('Preparing upload...');
+      console.log('Starting S3 upload process for file:', file.name);
       
       // Step 1: Get presigned URL from our API
+      console.log('Requesting presigned URL from /api/upload-to-s3');
       const presignedResponse = await fetch('/api/upload-to-s3', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -42,16 +44,20 @@ const FileUpload: React.FC<FileUploadProps> = ({ userId, onUploadSuccess }) => {
       });
       
       if (!presignedResponse.ok) {
-        const errorData = await presignedResponse.json();
+        const errorText = await presignedResponse.text();
+        console.error('Presigned URL request failed:', errorText);
         toast.dismiss(toastId);
-        toast.error(errorData.error || 'Failed to get upload URL');
+        toast.error(errorText || 'Failed to get upload URL');
         return;
       }
       
       // Step 2: Extract the upload URL and key from the response
-      const { uploadUrl, key, bucket, region } = await presignedResponse.json();
+      const presignedData = await presignedResponse.json();
+      console.log('Received presigned URL data:', presignedData);
+      const { uploadUrl, key, bucket, region } = presignedData;
       
       // Step 3: Upload the file directly to S3 using the presigned URL
+      console.log('Uploading file directly to S3 using presigned URL');
       const uploadResponse = await fetch(uploadUrl, {
         method: 'PUT',
         headers: { 'Content-Type': file.type },
@@ -59,16 +65,22 @@ const FileUpload: React.FC<FileUploadProps> = ({ userId, onUploadSuccess }) => {
       });
       
       if (!uploadResponse.ok) {
+        const errorText = await uploadResponse.text();
+        console.error('S3 upload failed:', errorText);
         toast.dismiss(toastId);
         toast.error(`Upload failed with status: ${uploadResponse.status}`);
         return;
       }
       
+      console.log('File uploaded successfully to S3');
+      
       // Generate the URL for the uploaded file
       const fileUrl = `https://${bucket}.s3.${region}.amazonaws.com/${key}`;
+      console.log('Generated S3 file URL:', fileUrl);
       
       // Step 4: Update Supabase metadata after successful upload
-      const response = await fetch('/api/update-file-metadata', {
+      console.log('Updating file metadata in Supabase');
+      const metadataResponse = await fetch('/api/update-file-metadata', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -80,14 +92,19 @@ const FileUpload: React.FC<FileUploadProps> = ({ userId, onUploadSuccess }) => {
         }),
       });
       
-      if (!response.ok) {
+      if (!metadataResponse.ok) {
+        const errorText = await metadataResponse.text();
+        console.error('Metadata update failed:', errorText);
         toast.dismiss(toastId);
         toast.error('Failed to update file metadata');
         return;
       }
       
+      const metadataResult = await metadataResponse.json();
+      console.log('Metadata update result:', metadataResult);
+      
       toast.dismiss(toastId);
-      toast.success('File uploaded successfully');
+      toast.success('File uploaded successfully to AWS S3');
       
       onUploadSuccess();
       e.target.value = '';
@@ -118,7 +135,7 @@ const FileUpload: React.FC<FileUploadProps> = ({ userId, onUploadSuccess }) => {
         >
           <div>
             <Upload className="h-6 w-6 mb-2" />
-            <span>{isUploading ? 'Uploading...' : 'Upload File'}</span>
+            <span>{isUploading ? 'Uploading to AWS S3...' : 'Upload File to S3'}</span>
             <p className="text-xs text-muted-foreground mt-1">
               Max file size: {formatBytes(MAX_FILE_SIZE_FREE)}
             </p>

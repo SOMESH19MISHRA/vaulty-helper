@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { 
@@ -49,6 +48,7 @@ const FilesList: React.FC<FilesListProps> = ({
   const fetchFiles = async () => {
     try {
       setIsLoading(true);
+      console.log('Fetching S3 files metadata from Supabase for userId:', userId);
       
       const { data, error } = await supabase
         .from('files')
@@ -57,9 +57,11 @@ const FilesList: React.FC<FilesListProps> = ({
         .order('uploaded_at', { ascending: false });
       
       if (error) {
+        console.error('Error fetching file metadata from Supabase:', error);
         throw error;
       }
       
+      console.log('Files metadata retrieved from Supabase:', data);
       setFiles(data || []);
     } catch (error) {
       console.error('Error fetching files:', error);
@@ -72,7 +74,10 @@ const FilesList: React.FC<FilesListProps> = ({
   const handlePreview = async (fileKey: string, fileName: string) => {
     try {
       setProcessingFileId(fileKey);
+      console.log('Generating preview URL for file:', fileKey);
+      
       const { downloadUrl } = await generateDownloadUrl(fileKey);
+      console.log('Generated preview URL:', downloadUrl);
       
       // Open the file in a new tab
       window.open(downloadUrl, '_blank');
@@ -87,7 +92,10 @@ const FilesList: React.FC<FilesListProps> = ({
   const handleDownload = async (fileKey: string, fileName: string) => {
     try {
       setProcessingFileId(fileKey);
+      console.log('Generating download URL for file:', fileKey);
+      
       const { downloadUrl } = await generateDownloadUrl(fileKey);
+      console.log('Generated download URL:', downloadUrl);
       
       // Create a temporary link to download the file
       const link = document.createElement('a');
@@ -110,21 +118,28 @@ const FilesList: React.FC<FilesListProps> = ({
     if (confirm(`Are you sure you want to delete ${file.filename}?`)) {
       try {
         setDeletingFileId(file.id);
+        console.log('Deleting file from S3:', file.s3_key);
         
         // Delete file from S3
         await deleteFile(file.s3_key);
+        console.log('File deleted from S3 successfully');
         
         // Delete metadata from Supabase
+        console.log('Deleting file metadata from Supabase');
         const { error } = await supabase
           .from('files')
           .delete()
           .eq('id', file.id);
         
         if (error) {
+          console.error('Error deleting file metadata from Supabase:', error);
           throw error;
         }
         
+        console.log('File metadata deleted from Supabase successfully');
+        
         // Recalculate user's storage usage
+        console.log('Recalculating user storage usage');
         const { data: remainingFiles, error: filesError } = await supabase
           .from('files')
           .select('size')
@@ -134,6 +149,7 @@ const FilesList: React.FC<FilesListProps> = ({
           console.error('Error fetching file sizes:', filesError);
         } else {
           const newTotalBytes = (remainingFiles || []).reduce((total, file) => total + (file.size || 0), 0);
+          console.log('Updated storage usage calculation:', newTotalBytes);
           
           // Update storage usage in Supabase
           await supabase
@@ -143,6 +159,8 @@ const FilesList: React.FC<FilesListProps> = ({
               total_bytes: newTotalBytes,
               updated_at: new Date().toISOString()
             }, { onConflict: 'user_id' });
+          
+          console.log('Storage usage updated in Supabase');
           
           // Notify parent components about the storage update
           if (onStorageUpdated) {
