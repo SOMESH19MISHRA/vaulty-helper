@@ -6,6 +6,7 @@ import NavBar from '@/components/NavBar';
 import { toast } from 'sonner';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { 
   FileItem, 
   FileFilter, 
@@ -31,11 +32,14 @@ import FileSearch from '@/components/FileSearch';
 import FilesGrid from '@/components/FilesGrid';
 import FilesTable from '@/components/FilesTable';
 import FolderBreadcrumb from '@/components/FolderBreadcrumb';
+import ShareFileModal from '@/components/ShareFileModal';
+import SharedFilesTab from '@/components/SharedFilesTab';
 import { 
   LayoutGrid, 
   List, 
   AlertTriangle, 
-  Download
+  Download,
+  Share2
 } from 'lucide-react';
 import { 
   AlertDialog, 
@@ -62,6 +66,7 @@ const Dashboard = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [totalSize, setTotalSize] = useState(0);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [activeTab, setActiveTab] = useState<'files' | 'shared'>('files');
   
   // Modal states
   const [folderModalOpen, setFolderModalOpen] = useState(false);
@@ -70,6 +75,8 @@ const Dashboard = () => {
   const [folderParentId, setFolderParentId] = useState<string | null>(null);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [itemToDelete, setItemToDelete] = useState<{ type: 'file' | 'folder', item: any } | null>(null);
+  const [shareModalOpen, setShareModalOpen] = useState(false);
+  const [fileToShare, setFileToShare] = useState<FileItem | null>(null);
   
   // Load data
   useEffect(() => {
@@ -81,10 +88,10 @@ const Dashboard = () => {
   
   // Load files when filters change
   useEffect(() => {
-    if (user) {
+    if (user && activeTab === 'files') {
       fetchFiles();
     }
-  }, [user, filters]);
+  }, [user, filters, activeTab]);
   
   // Update current folder path when folder ID changes
   useEffect(() => {
@@ -302,6 +309,12 @@ const Dashboard = () => {
     }
   };
   
+  // Handle file sharing
+  const handleFileShare = (file: FileItem) => {
+    setFileToShare(file);
+    setShareModalOpen(true);
+  };
+  
   // Handle folder actions
   const handleFolderAction = (action: 'open' | 'rename' | 'delete', folder: Folder) => {
     switch (action) {
@@ -318,7 +331,7 @@ const Dashboard = () => {
   };
   
   // Handle file actions
-  const handleFileAction = (action: 'download' | 'delete' | 'move', file: FileItem) => {
+  const handleFileAction = (action: 'download' | 'delete' | 'move' | 'share', file: FileItem) => {
     switch (action) {
       case 'download':
         handleFileDownload(file);
@@ -328,6 +341,9 @@ const Dashboard = () => {
         break;
       case 'move':
         // TODO: Implement file move functionality
+        break;
+      case 'share':
+        handleFileShare(file);
         break;
     }
   };
@@ -393,103 +409,126 @@ const Dashboard = () => {
             
             {/* Main content area */}
             <div className="flex-1">
-              <Card className="border-0 shadow-lg glass-panel">
-                <CardHeader className="pb-2">
-                  <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                    <div className="flex-1">
-                      {/* Breadcrumb navigation */}
-                      <FolderBreadcrumb 
-                        folders={folderPath}
-                        onNavigate={handleSelectFolder}
-                      />
-                    </div>
-                    
-                    {/* View toggle buttons */}
-                    <div className="flex items-center gap-2">
-                      <Button
-                        variant={viewMode === 'grid' ? 'default' : 'outline'}
-                        size="sm"
-                        onClick={() => setViewMode('grid')}
-                        className="h-8 w-8 p-0"
-                      >
-                        <LayoutGrid className="h-4 w-4" />
-                        <span className="sr-only">Grid view</span>
-                      </Button>
-                      <Button
-                        variant={viewMode === 'list' ? 'default' : 'outline'}
-                        size="sm"
-                        onClick={() => setViewMode('list')}
-                        className="h-8 w-8 p-0"
-                      >
-                        <List className="h-4 w-4" />
-                        <span className="sr-only">List view</span>
-                      </Button>
-                    </div>
-                  </div>
-                  
-                  {/* Search and filters */}
-                  <div className="mt-4">
-                    <FileSearch 
-                      onFilterChange={handleFilterChange}
-                      fileTypes={fileTypes}
-                    />
-                  </div>
-                </CardHeader>
+              <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'files' | 'shared')}>
+                <div className="flex justify-between items-center mb-4">
+                  <TabsList>
+                    <TabsTrigger value="files" className="px-6">Files</TabsTrigger>
+                    <TabsTrigger value="shared" className="px-6">
+                      <Share2 className="h-4 w-4 mr-2" />
+                      Shared Links
+                    </TabsTrigger>
+                  </TabsList>
+                </div>
                 
-                <CardContent>
-                  {/* Upload button */}
-                  <div className="mb-6">
-                    <FileUpload 
-                      userId={user.id} 
-                      folderId={selectedFolderId}
-                      onUploadSuccess={fetchFiles}
-                    />
-                  </div>
+                <TabsContent value="files" className="mt-0">
+                  <Card className="border-0 shadow-lg glass-panel">
+                    <CardHeader className="pb-2">
+                      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                        <div className="flex-1">
+                          {/* Breadcrumb navigation */}
+                          <FolderBreadcrumb 
+                            folders={folderPath}
+                            onNavigate={handleSelectFolder}
+                          />
+                        </div>
+                        
+                        {/* View toggle buttons */}
+                        <div className="flex items-center gap-2">
+                          <Button
+                            variant={viewMode === 'grid' ? 'default' : 'outline'}
+                            size="sm"
+                            onClick={() => setViewMode('grid')}
+                            className="h-8 w-8 p-0"
+                          >
+                            <LayoutGrid className="h-4 w-4" />
+                            <span className="sr-only">Grid view</span>
+                          </Button>
+                          <Button
+                            variant={viewMode === 'list' ? 'default' : 'outline'}
+                            size="sm"
+                            onClick={() => setViewMode('list')}
+                            className="h-8 w-8 p-0"
+                          >
+                            <List className="h-4 w-4" />
+                            <span className="sr-only">List view</span>
+                          </Button>
+                        </div>
+                      </div>
+                      
+                      {/* Search and filters */}
+                      <div className="mt-4">
+                        <FileSearch 
+                          onFilterChange={handleFilterChange}
+                          fileTypes={fileTypes}
+                        />
+                      </div>
+                    </CardHeader>
+                    
+                    <CardContent>
+                      {/* Upload button */}
+                      <div className="mb-6">
+                        <FileUpload 
+                          userId={user.id} 
+                          folderId={selectedFolderId}
+                          onUploadSuccess={fetchFiles}
+                        />
+                      </div>
+                      
+                      {isLoading ? (
+                        <div className="flex justify-center py-12">
+                          <div className="h-8 w-8 border-4 border-cloud border-t-transparent rounded-full animate-spin"></div>
+                        </div>
+                      ) : viewMode === 'grid' ? (
+                        <FilesGrid
+                          files={files}
+                          folders={currentFolders}
+                          onFileAction={handleFileAction}
+                          onFolderAction={handleFolderAction}
+                        />
+                      ) : (
+                        <FilesTable
+                          files={files}
+                          folders={currentFolders}
+                          onFileAction={handleFileAction}
+                          onFolderAction={handleFolderAction}
+                        />
+                      )}
+                    </CardContent>
+                  </Card>
                   
-                  {isLoading ? (
-                    <div className="flex justify-center py-12">
-                      <div className="h-8 w-8 border-4 border-cloud border-t-transparent rounded-full animate-spin"></div>
-                    </div>
-                  ) : viewMode === 'grid' ? (
-                    <FilesGrid
-                      files={files}
-                      folders={currentFolders}
-                      onFileAction={handleFileAction}
-                      onFolderAction={handleFolderAction}
-                    />
-                  ) : (
-                    <FilesTable
-                      files={files}
-                      folders={currentFolders}
-                      onFileAction={handleFileAction}
-                      onFolderAction={handleFolderAction}
-                    />
-                  )}
-                </CardContent>
-              </Card>
-              
-              {/* Storage stats */}
-              <Card className="border-0 shadow-lg glass-panel mt-6">
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-lg">Storage Usage</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="flex flex-col md:flex-row gap-6 items-center">
-                    <div className="text-center">
-                      <p className="text-2xl font-bold text-cloud">{files.length}</p>
-                      <p className="text-muted-foreground">files</p>
-                    </div>
-                    <div className="text-center">
-                      <p className="text-2xl font-bold text-cloud">{folders.length}</p>
-                      <p className="text-muted-foreground">folders</p>
-                    </div>
-                    <div className="text-center">
-                      <p className="text-2xl font-bold text-cloud">{formatSize(totalSize)}</p>
-                      <p className="text-muted-foreground">total storage used</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
+                  {/* Storage stats */}
+                  <Card className="border-0 shadow-lg glass-panel mt-6">
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-lg">Storage Usage</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="flex flex-col md:flex-row gap-6 items-center">
+                        <div className="text-center">
+                          <p className="text-2xl font-bold text-cloud">{files.length}</p>
+                          <p className="text-muted-foreground">files</p>
+                        </div>
+                        <div className="text-center">
+                          <p className="text-2xl font-bold text-cloud">{folders.length}</p>
+                          <p className="text-muted-foreground">folders</p>
+                        </div>
+                        <div className="text-center">
+                          <p className="text-2xl font-bold text-cloud">{formatSize(totalSize)}</p>
+                          <p className="text-muted-foreground">total storage used</p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </TabsContent>
+                
+                {/* Shared files tab */}
+                <TabsContent value="shared" className="mt-0">
+                  <Card className="border-0 shadow-lg glass-panel">
+                    <CardContent className="pt-6">
+                      {user && <SharedFilesTab userId={user.id} />}
+                    </CardContent>
+                  </Card>
+                </TabsContent>
+              </Tabs>
             </div>
           </div>
         </div>
@@ -510,6 +549,16 @@ const Dashboard = () => {
         }
         submitLabel={folderModalMode === 'create' ? 'Create' : 'Rename'}
       />
+      
+      {/* Share File Modal */}
+      {user && (
+        <ShareFileModal
+          isOpen={shareModalOpen}
+          onClose={() => setShareModalOpen(false)}
+          file={fileToShare}
+          userId={user.id}
+        />
+      )}
       
       {/* Delete Confirmation Dialog */}
       <AlertDialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>

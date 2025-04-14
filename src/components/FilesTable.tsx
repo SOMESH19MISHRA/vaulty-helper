@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Download, Edit, Folder, MoreHorizontal, Trash2 } from 'lucide-react';
+import { Download, Edit, Folder, MoreHorizontal, Trash2, Share2 } from 'lucide-react';
 import { FileItem } from '@/lib/files';
 import { Folder as FolderType } from '@/lib/folders';
 import { Button } from '@/components/ui/button';
@@ -16,7 +16,7 @@ import { formatDistanceToNow } from 'date-fns';
 interface FilesTableProps {
   files: FileItem[];
   folders: FolderType[];
-  onFileAction: (action: 'download' | 'delete' | 'move', file: FileItem) => void;
+  onFileAction: (action: 'download' | 'delete' | 'move' | 'share', file: FileItem) => void;
   onFolderAction: (action: 'open' | 'rename' | 'delete', folder: FolderType) => void;
 }
 
@@ -124,6 +124,10 @@ const FilesTable: React.FC<FilesTableProps> = ({
                       <DropdownMenuItem onClick={() => onFileAction('download', file)}>
                         <Download className="mr-2 h-4 w-4" />
                         <span>Download</span>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => onFileAction('share', file)}>
+                        <Share2 className="mr-2 h-4 w-4" />
+                        <span>Share</span>
                       </DropdownMenuItem>
                       <DropdownMenuItem
                         className="text-destructive focus:text-destructive"

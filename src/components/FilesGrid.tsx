@@ -2,14 +2,14 @@
 import React from 'react';
 import { 
   FileIcon, 
-  FileTextIcon, 
-  FileImageIcon, 
-  FileVideoIcon, 
-  FileAudioIcon, 
-  FilePdfIcon, 
-  FileArchiveIcon, 
-  FileSpreadsheetIcon, 
-  FilePresentationIcon,
+  FileText, 
+  Image, 
+  Video, 
+  Music, 
+  File, 
+  FileArchive,
+  FileSpreadsheet,
+  PresentationIcon,
   MoreVertical,
   Download,
   Trash2,
@@ -30,7 +30,7 @@ import { formatDistanceToNow } from 'date-fns';
 interface FilesGridProps {
   files: FileItem[];
   folders: Folder[];
-  onFileAction: (action: 'download' | 'delete' | 'move', file: FileItem) => void;
+  onFileAction: (action: 'download' | 'delete' | 'move' | 'share', file: FileItem) => void;
   onFolderAction: (action: 'open' | 'rename' | 'delete', folder: Folder) => void;
 }
 
@@ -51,17 +51,17 @@ const FilesGrid: React.FC<FilesGridProps> = ({
   
   // Return appropriate icon based on file type
   const getFileIcon = (fileType: string) => {
-    if (fileType.startsWith('image/')) return <FileImageIcon className="h-10 w-10 text-blue-500" />;
-    if (fileType.startsWith('video/')) return <FileVideoIcon className="h-10 w-10 text-purple-500" />;
-    if (fileType.startsWith('audio/')) return <FileAudioIcon className="h-10 w-10 text-green-500" />;
-    if (fileType === 'application/pdf') return <FilePdfIcon className="h-10 w-10 text-red-500" />;
-    if (fileType.includes('spreadsheet') || fileType.includes('excel') || fileType === 'text/csv') 
-      return <FileSpreadsheetIcon className="h-10 w-10 text-green-700" />;
+    if (fileType.startsWith('image/')) return <Image className="h-10 w-10 text-blue-500" />;
+    if (fileType.startsWith('video/')) return <Video className="h-10 w-10 text-purple-500" />;
+    if (fileType.startsWith('audio/')) return <Music className="h-10 w-10 text-green-500" />;
+    if (fileType === 'application/pdf') return <File className="h-10 w-10 text-red-500" />;
+    if (fileType.includes('spreadsheet') || fileType.includes('excel') || fileType.includes('csv')) 
+      return <FileSpreadsheet className="h-10 w-10 text-green-700" />;
     if (fileType.includes('presentation') || fileType.includes('powerpoint')) 
-      return <FilePresentationIcon className="h-10 w-10 text-orange-500" />;
+      return <PresentationIcon className="h-10 w-10 text-orange-500" />;
     if (fileType.includes('archive') || fileType.includes('zip') || fileType.includes('compressed')) 
-      return <FileArchiveIcon className="h-10 w-10 text-yellow-600" />;
-    if (fileType.startsWith('text/')) return <FileTextIcon className="h-10 w-10 text-gray-600" />;
+      return <FileArchive className="h-10 w-10 text-yellow-600" />;
+    if (fileType.startsWith('text/')) return <FileText className="h-10 w-10 text-gray-600" />;
     
     return <FileIcon className="h-10 w-10 text-gray-500" />;
   };
@@ -149,6 +149,14 @@ const FilesGrid: React.FC<FilesGridProps> = ({
                 <DropdownMenuItem onClick={() => onFileAction('download', file)}>
                   <Download className="mr-2 h-4 w-4" />
                   Download
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => onFileAction('share', file)}>
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-2 h-4 w-4">
+                    <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"></path>
+                    <polyline points="16 6 12 2 8 6"></polyline>
+                    <line x1="12" y1="2" x2="12" y2="15"></line>
+                  </svg>
+                  Share
                 </DropdownMenuItem>
                 <DropdownMenuItem
                   className="text-destructive focus:text-destructive"
