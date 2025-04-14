@@ -12,13 +12,25 @@ const s3Client = new S3Client({
   },
 });
 
-const bucket = "cloudvault-userfiles"; // Updated bucket name
+const bucket = "cloudvault-userfiles"; // S3 bucket name
 
 export async function POST(req: Request) {
   try {
     console.log("[API] upload-to-s3: Request received");
     
-    const body = await req.json();
+    let body;
+    try {
+      const text = await req.text();
+      console.log("[API] upload-to-s3: Request body (raw):", text);
+      body = JSON.parse(text);
+    } catch (parseError) {
+      console.error("[API] upload-to-s3: JSON parse error:", parseError);
+      return new Response(
+        JSON.stringify({ error: "Failed to parse JSON body" }),
+        { status: 400, headers: { "Content-Type": "application/json" } }
+      );
+    }
+    
     const { fileName, fileType, userId } = body;
     
     console.log("[API] upload-to-s3: Request parameters:", { 
@@ -49,6 +61,13 @@ export async function POST(req: Request) {
     const key = `${userId}/${timestamp}-${sanitizedFilename}`;
     console.log("[API] upload-to-s3: Generated S3 key:", key);
     
+    console.log("[API] upload-to-s3: S3 client config:", {
+      region: AWS_REGION,
+      hasAccessKey: !!AWS_ACCESS_KEY,
+      hasSecretKey: !!AWS_SECRET_KEY,
+      bucket
+    });
+    
     // Create the command for putting an object to S3
     const command = new PutObjectCommand({
       Bucket: bucket,
@@ -63,6 +82,7 @@ export async function POST(req: Request) {
     const uploadUrl = await getSignedUrl(s3Client, command, { expiresIn: 60 });
     
     console.log("[API] upload-to-s3: Generated signed URL successfully");
+    console.log("[API] upload-to-s3: URL begins with:", uploadUrl.substring(0, 50) + '...');
     
     // Return the signed URL and the file key
     return new Response(

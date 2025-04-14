@@ -108,6 +108,116 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   }
 });
 
+// Initialize required database tables if they don't exist
+export const initializeTables = async () => {
+  console.log("Initializing required database tables if they don't exist");
+  
+  try {
+    // Create files table if it doesn't exist
+    const { error: filesError } = await supabase.rpc('create_files_table_if_not_exists', {});
+    
+    if (filesError) {
+      console.error("Error creating files table with RPC:", filesError);
+      
+      // Fallback: Try creating the table with raw SQL
+      const { error: sqlError } = await supabase.from('files').select('count(*)').limit(1);
+      
+      if (sqlError && sqlError.code === '42P01') {
+        console.log("Files table doesn't exist. Creating it manually...");
+        
+        const { error } = await supabase.sql`
+          CREATE TABLE IF NOT EXISTS public.files (
+            id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+            filename TEXT NOT NULL,
+            size BIGINT NOT NULL,
+            s3_key TEXT NOT NULL UNIQUE,
+            s3_url TEXT NOT NULL,
+            user_id UUID NOT NULL,
+            uploaded_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+            content_type TEXT
+          );
+        `;
+        
+        if (error) {
+          console.error("Failed to create files table:", error);
+        } else {
+          console.log("Files table created successfully");
+        }
+      }
+    } else {
+      console.log("Files table exists or was created successfully");
+    }
+    
+    // Create storage_usage table if it doesn't exist
+    const { error: storageError } = await supabase.rpc('create_storage_usage_table_if_not_exists', {});
+    
+    if (storageError) {
+      console.error("Error creating storage_usage table with RPC:", storageError);
+      
+      // Fallback: Try creating the table with raw SQL
+      const { error: sqlError } = await supabase.from('storage_usage').select('count(*)').limit(1);
+      
+      if (sqlError && sqlError.code === '42P01') {
+        console.log("Storage usage table doesn't exist. Creating it manually...");
+        
+        const { error } = await supabase.sql`
+          CREATE TABLE IF NOT EXISTS public.storage_usage (
+            user_id UUID PRIMARY KEY,
+            total_bytes BIGINT NOT NULL DEFAULT 0,
+            updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+          );
+        `;
+        
+        if (error) {
+          console.error("Failed to create storage_usage table:", error);
+        } else {
+          console.log("Storage usage table created successfully");
+        }
+      }
+    } else {
+      console.log("Storage usage table exists or was created successfully");
+    }
+    
+    // Create subscriptions table if it doesn't exist
+    const { error: subsError } = await supabase.rpc('create_subscriptions_table_if_not_exists', {});
+    
+    if (subsError) {
+      console.error("Error creating subscriptions table with RPC:", subsError);
+      
+      // Fallback: Try creating the table with raw SQL
+      const { error: sqlError } = await supabase.from('subscriptions').select('count(*)').limit(1);
+      
+      if (sqlError && sqlError.code === '42P01') {
+        console.log("Subscriptions table doesn't exist. Creating it manually...");
+        
+        const { error } = await supabase.sql`
+          CREATE TABLE IF NOT EXISTS public.subscriptions (
+            user_id UUID PRIMARY KEY,
+            tier TEXT NOT NULL DEFAULT 'free',
+            updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+          );
+        `;
+        
+        if (error) {
+          console.error("Failed to create subscriptions table:", error);
+        } else {
+          console.log("Subscriptions table created successfully");
+        }
+      }
+    } else {
+      console.log("Subscriptions table exists or was created successfully");
+    }
+    
+    return { success: true };
+  } catch (error) {
+    console.error("Failed to initialize database tables:", error);
+    return { 
+      success: false, 
+      error: error instanceof Error ? error.message : String(error) 
+    };
+  }
+};
+
 // Helper function to check if user is online
 export const isOnline = () => navigator.onLine;
 

@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { 
@@ -5,13 +6,14 @@ import {
   TableHeader, TableRow 
 } from '@/components/ui/table';
 import { 
-  Download, Eye, Trash2, Loader2 
+  Download, Eye, Trash2, Loader2, AlertTriangle 
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { supabase } from '@/lib/supabase';
+import { supabase, initializeTables } from '@/lib/supabase';
 import { formatBytes } from '@/lib/utils';
 import { format } from 'date-fns';
 import { deleteFile, generateDownloadUrl } from '@/lib/aws';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 
 interface FilesListProps {
   userId: string;
@@ -27,6 +29,7 @@ interface FileItem {
   s3_url: string;
   uploaded_at: string;
   user_id: string;
+  content_type?: string;
 }
 
 const FilesList: React.FC<FilesListProps> = ({ 
@@ -38,6 +41,7 @@ const FilesList: React.FC<FilesListProps> = ({
   const [isLoading, setIsLoading] = useState(true);
   const [deletingFileId, setDeletingFileId] = useState<string | null>(null);
   const [processingFileId, setProcessingFileId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (userId) {
@@ -48,7 +52,16 @@ const FilesList: React.FC<FilesListProps> = ({
   const fetchFiles = async () => {
     try {
       setIsLoading(true);
+      setError(null);
       console.log('Fetching S3 files metadata from Supabase for userId:', userId);
+      
+      // Check if the files table exists and create it if needed
+      try {
+        await initializeTables();
+      } catch (initError) {
+        console.error('Error initializing tables:', initError);
+        // Continue anyway to see if the table exists now
+      }
       
       const { data, error } = await supabase
         .from('files')
@@ -58,6 +71,13 @@ const FilesList: React.FC<FilesListProps> = ({
       
       if (error) {
         console.error('Error fetching file metadata from Supabase:', error);
+        
+        if (error.code === '42P01') {
+          setError('Database tables are not set up correctly. Please try again in a moment.');
+        } else {
+          setError(`Failed to load your files: ${error.message}`);
+        }
+        
         throw error;
       }
       
@@ -65,7 +85,9 @@ const FilesList: React.FC<FilesListProps> = ({
       setFiles(data || []);
     } catch (error) {
       console.error('Error fetching files:', error);
-      toast.error('Failed to load your files');
+      if (!error) {
+        setError('Failed to load your files due to an unknown error');
+      }
     } finally {
       setIsLoading(false);
     }
@@ -186,6 +208,11 @@ const FilesList: React.FC<FilesListProps> = ({
     }
   };
 
+  const handleRefresh = () => {
+    fetchFiles();
+    toast.success('Refreshing file list');
+  };
+
   if (isLoading) {
     return (
       <div className="flex justify-center items-center py-8">
@@ -194,16 +221,40 @@ const FilesList: React.FC<FilesListProps> = ({
     );
   }
 
+  if (error) {
+    return (
+      <Alert variant="destructive" className="mb-4">
+        <AlertTriangle className="h-4 w-4" />
+        <AlertDescription>
+          {error}
+          <div className="mt-2">
+            <Button variant="outline" size="sm" onClick={handleRefresh}>
+              Try Again
+            </Button>
+          </div>
+        </AlertDescription>
+      </Alert>
+    );
+  }
+
   if (files.length === 0) {
     return (
       <div className="text-center py-8 border rounded-lg">
         <p className="text-gray-500">No files uploaded yet</p>
+        <Button variant="outline" size="sm" onClick={handleRefresh} className="mt-2">
+          Refresh
+        </Button>
       </div>
     );
   }
 
   return (
     <div className="rounded-md border">
+      <div className="p-2 flex justify-end">
+        <Button variant="outline" size="sm" onClick={handleRefresh}>
+          Refresh List
+        </Button>
+      </div>
       <Table>
         <TableHeader>
           <TableRow>
