@@ -5,10 +5,10 @@ import { createClient } from '@supabase/supabase-js';
 const supabaseUrl = 'https://ndmzmfozxuchgzehcvhl.supabase.co';
 const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5kbXptZm96eHVjaGd6ZWhjdmhsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDI4OTU3MTYsImV4cCI6MjA1ODQ3MTcxNn0.rQnSCQOMmLIGlZkeS5h9VErG8chvdQUorpBzgfGgmHw';
 
-// AWS Configuration 
-export const AWS_REGION = "us-east-2";
+// AWS Configuration (would typically come from environment variables)
+export const AWS_REGION = "us-east-1";
 export const AWS_ACCESS_KEY = "AKIAST6S7LIAJGJNEDOW"; 
-export const AWS_SECRET_KEY = "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";
+export const AWS_SECRET_KEY = "HKmGsvrqv/WsczRtCaNEO6YDvd2rqmpaxilCGXUs";
 
 // For diagnostic purposes
 export const checkSupabaseConnection = async () => {
@@ -107,77 +107,6 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     }
   }
 });
-
-// Initialize required database tables if they don't exist
-export const initializeTables = async () => {
-  console.log("Initializing required database tables if they don't exist");
-  
-  try {
-    // Check if files table exists
-    console.log("Checking if files table exists");
-    const { error: filesError } = await supabase.from('files').select('id').limit(1);
-    
-    if (filesError && filesError.code === '42P01') {
-      console.error("Files table doesn't exist. Please create it via Supabase dashboard with this schema:");
-      console.log(`
-CREATE TABLE public.files (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  filename TEXT NOT NULL,
-  size BIGINT NOT NULL,
-  s3_key TEXT NOT NULL UNIQUE,
-  s3_url TEXT NOT NULL,
-  user_id UUID NOT NULL,
-  uploaded_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-  content_type TEXT
-);
-      `);
-    } else {
-      console.log("Files table exists");
-    }
-    
-    // Check if storage_usage table exists
-    console.log("Checking if storage_usage table exists");
-    const { error: storageError } = await supabase.from('storage_usage').select('user_id').limit(1);
-    
-    if (storageError && storageError.code === '42P01') {
-      console.error("Storage usage table doesn't exist. Please create it via Supabase dashboard with this schema:");
-      console.log(`
-CREATE TABLE public.storage_usage (
-  user_id UUID PRIMARY KEY,
-  total_bytes BIGINT NOT NULL DEFAULT 0,
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-);
-      `);
-    } else {
-      console.log("Storage usage table exists");
-    }
-    
-    // Check if subscriptions table exists
-    console.log("Checking if subscriptions table exists");
-    const { error: subsError } = await supabase.from('subscriptions').select('user_id').limit(1);
-    
-    if (subsError && subsError.code === '42P01') {
-      console.error("Subscriptions table doesn't exist. Please create it via Supabase dashboard with this schema:");
-      console.log(`
-CREATE TABLE public.subscriptions (
-  user_id UUID PRIMARY KEY,
-  tier TEXT NOT NULL DEFAULT 'free',
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-);
-      `);
-    } else {
-      console.log("Subscriptions table exists");
-    }
-    
-    return { success: true };
-  } catch (error) {
-    console.error("Failed to initialize database tables:", error);
-    return { 
-      success: false, 
-      error: error instanceof Error ? error.message : String(error) 
-    };
-  }
-};
 
 // Helper function to check if user is online
 export const isOnline = () => navigator.onLine;
