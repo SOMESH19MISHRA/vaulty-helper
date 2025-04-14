@@ -51,39 +51,23 @@ export async function POST(req: Request) {
       );
     }
 
-    // Check if files table exists and create it if it doesn't
+    // Check if files table exists
     try {
       console.log("[API] update-file-metadata: Checking if files table exists");
-      const { error: checkError } = await supabase.from('files').select('count(*)').limit(1);
+      const { error: checkError } = await supabase.from('files').select('id').limit(1);
       
       if (checkError && checkError.code === '42P01') {
         console.log("[API] update-file-metadata: Files table doesn't exist, creating it");
         
-        const { error: createError } = await supabase.sql`
-          CREATE TABLE IF NOT EXISTS public.files (
-            id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-            filename TEXT NOT NULL,
-            size BIGINT NOT NULL,
-            s3_key TEXT NOT NULL UNIQUE,
-            s3_url TEXT NOT NULL,
-            user_id UUID NOT NULL,
-            uploaded_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-            content_type TEXT
-          );
-        `;
-        
-        if (createError) {
-          console.error('[API] update-file-metadata: Failed to create files table:', createError);
-          return new Response(
-            JSON.stringify({ error: `Failed to create files table: ${createError.message}` }),
-            { status: 500, headers: { "Content-Type": "application/json" } }
-          );
-        }
-        
-        console.log("[API] update-file-metadata: Files table created successfully");
+        // Instead of using raw SQL, let's let the user know they need to create the table
+        console.error('[API] update-file-metadata: Files table does not exist. Please create it via Supabase dashboard');
+        return new Response(
+          JSON.stringify({ error: "Files table doesn't exist. Please create it in your Supabase project." }),
+          { status: 500, headers: { "Content-Type": "application/json" } }
+        );
       }
     } catch (error) {
-      console.error('[API] update-file-metadata: Error checking/creating files table:', error);
+      console.error('[API] update-file-metadata: Error checking files table:', error);
       // Continue anyway as the table might exist
     }
 
@@ -112,31 +96,26 @@ export async function POST(req: Request) {
     
     console.log("[API] update-file-metadata: File metadata inserted successfully:", insertedData);
     
-    // Check if storage_usage table exists and create it if it doesn't
+    // Check if storage_usage table exists
     try {
       console.log("[API] update-file-metadata: Checking if storage_usage table exists");
-      const { error: checkError } = await supabase.from('storage_usage').select('count(*)').limit(1);
+      const { error: checkError } = await supabase.from('storage_usage').select('user_id').limit(1);
       
       if (checkError && checkError.code === '42P01') {
-        console.log("[API] update-file-metadata: Storage usage table doesn't exist, creating it");
+        console.log("[API] update-file-metadata: Storage usage table doesn't exist, skipping storage update");
         
-        const { error: createError } = await supabase.sql`
-          CREATE TABLE IF NOT EXISTS public.storage_usage (
-            user_id UUID PRIMARY KEY,
-            total_bytes BIGINT NOT NULL DEFAULT 0,
-            updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-          );
-        `;
-        
-        if (createError) {
-          console.error('[API] update-file-metadata: Failed to create storage_usage table:', createError);
-          // Continue as we already saved file metadata
-        } else {
-          console.log("[API] update-file-metadata: Storage usage table created successfully");
-        }
+        // Return success but note that storage wasn't updated
+        return new Response(
+          JSON.stringify({ 
+            success: true,
+            message: "File metadata updated successfully, but storage usage tracking is not available.",
+            fileData: { filename, size, s3Key, s3Url }
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } }
+        );
       }
     } catch (error) {
-      console.error('[API] update-file-metadata: Error checking/creating storage_usage table:', error);
+      console.error('[API] update-file-metadata: Error checking storage_usage table:', error);
       // Continue anyway as the file metadata was saved
     }
     

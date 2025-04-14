@@ -113,99 +113,60 @@ export const initializeTables = async () => {
   console.log("Initializing required database tables if they don't exist");
   
   try {
-    // Create files table if it doesn't exist
-    const { error: filesError } = await supabase.rpc('create_files_table_if_not_exists', {});
+    // Check if files table exists
+    console.log("Checking if files table exists");
+    const { error: filesError } = await supabase.from('files').select('id').limit(1);
     
-    if (filesError) {
-      console.error("Error creating files table with RPC:", filesError);
-      
-      // Fallback: Try creating the table with raw SQL
-      const { error: sqlError } = await supabase.from('files').select('count(*)').limit(1);
-      
-      if (sqlError && sqlError.code === '42P01') {
-        console.log("Files table doesn't exist. Creating it manually...");
-        
-        const { error } = await supabase.sql`
-          CREATE TABLE IF NOT EXISTS public.files (
-            id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-            filename TEXT NOT NULL,
-            size BIGINT NOT NULL,
-            s3_key TEXT NOT NULL UNIQUE,
-            s3_url TEXT NOT NULL,
-            user_id UUID NOT NULL,
-            uploaded_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-            content_type TEXT
-          );
-        `;
-        
-        if (error) {
-          console.error("Failed to create files table:", error);
-        } else {
-          console.log("Files table created successfully");
-        }
-      }
+    if (filesError && filesError.code === '42P01') {
+      console.error("Files table doesn't exist. Please create it via Supabase dashboard with this schema:");
+      console.log(`
+CREATE TABLE public.files (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  filename TEXT NOT NULL,
+  size BIGINT NOT NULL,
+  s3_key TEXT NOT NULL UNIQUE,
+  s3_url TEXT NOT NULL,
+  user_id UUID NOT NULL,
+  uploaded_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+  content_type TEXT
+);
+      `);
     } else {
-      console.log("Files table exists or was created successfully");
+      console.log("Files table exists");
     }
     
-    // Create storage_usage table if it doesn't exist
-    const { error: storageError } = await supabase.rpc('create_storage_usage_table_if_not_exists', {});
+    // Check if storage_usage table exists
+    console.log("Checking if storage_usage table exists");
+    const { error: storageError } = await supabase.from('storage_usage').select('user_id').limit(1);
     
-    if (storageError) {
-      console.error("Error creating storage_usage table with RPC:", storageError);
-      
-      // Fallback: Try creating the table with raw SQL
-      const { error: sqlError } = await supabase.from('storage_usage').select('count(*)').limit(1);
-      
-      if (sqlError && sqlError.code === '42P01') {
-        console.log("Storage usage table doesn't exist. Creating it manually...");
-        
-        const { error } = await supabase.sql`
-          CREATE TABLE IF NOT EXISTS public.storage_usage (
-            user_id UUID PRIMARY KEY,
-            total_bytes BIGINT NOT NULL DEFAULT 0,
-            updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-          );
-        `;
-        
-        if (error) {
-          console.error("Failed to create storage_usage table:", error);
-        } else {
-          console.log("Storage usage table created successfully");
-        }
-      }
+    if (storageError && storageError.code === '42P01') {
+      console.error("Storage usage table doesn't exist. Please create it via Supabase dashboard with this schema:");
+      console.log(`
+CREATE TABLE public.storage_usage (
+  user_id UUID PRIMARY KEY,
+  total_bytes BIGINT NOT NULL DEFAULT 0,
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+      `);
     } else {
-      console.log("Storage usage table exists or was created successfully");
+      console.log("Storage usage table exists");
     }
     
-    // Create subscriptions table if it doesn't exist
-    const { error: subsError } = await supabase.rpc('create_subscriptions_table_if_not_exists', {});
+    // Check if subscriptions table exists
+    console.log("Checking if subscriptions table exists");
+    const { error: subsError } = await supabase.from('subscriptions').select('user_id').limit(1);
     
-    if (subsError) {
-      console.error("Error creating subscriptions table with RPC:", subsError);
-      
-      // Fallback: Try creating the table with raw SQL
-      const { error: sqlError } = await supabase.from('subscriptions').select('count(*)').limit(1);
-      
-      if (sqlError && sqlError.code === '42P01') {
-        console.log("Subscriptions table doesn't exist. Creating it manually...");
-        
-        const { error } = await supabase.sql`
-          CREATE TABLE IF NOT EXISTS public.subscriptions (
-            user_id UUID PRIMARY KEY,
-            tier TEXT NOT NULL DEFAULT 'free',
-            updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-          );
-        `;
-        
-        if (error) {
-          console.error("Failed to create subscriptions table:", error);
-        } else {
-          console.log("Subscriptions table created successfully");
-        }
-      }
+    if (subsError && subsError.code === '42P01') {
+      console.error("Subscriptions table doesn't exist. Please create it via Supabase dashboard with this schema:");
+      console.log(`
+CREATE TABLE public.subscriptions (
+  user_id UUID PRIMARY KEY,
+  tier TEXT NOT NULL DEFAULT 'free',
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+      `);
     } else {
-      console.log("Subscriptions table exists or was created successfully");
+      console.log("Subscriptions table exists");
     }
     
     return { success: true };

@@ -9,7 +9,7 @@ import {
   Download, Eye, Trash2, Loader2, AlertTriangle 
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { supabase, initializeTables } from '@/lib/supabase';
+import { supabase } from '@/lib/supabase';
 import { formatBytes } from '@/lib/utils';
 import { format } from 'date-fns';
 import { deleteFile, generateDownloadUrl } from '@/lib/aws';
@@ -55,14 +55,27 @@ const FilesList: React.FC<FilesListProps> = ({
       setError(null);
       console.log('Fetching S3 files metadata from Supabase for userId:', userId);
       
-      // Check if the files table exists and create it if needed
+      // Check if tables exist but don't try to create them
       try {
-        await initializeTables();
+        // Check if the files table exists
+        const { error } = await supabase
+          .from('files')
+          .select('id')
+          .limit(1);
+          
+        if (error && error.code === '42P01') {
+          console.error('Files table does not exist:', error);
+          setError('The files table does not exist in the database. Please create it in your Supabase project.');
+          setIsLoading(false);
+          return;
+        }
       } catch (initError) {
-        console.error('Error initializing tables:', initError);
-        // Continue anyway to see if the table exists now
+        console.error('Error checking tables:', initError);
+        // Continue anyway to see if the query works
       }
       
+      // Get all files for this user
+      // Important: Clone the response so we only handle it once
       const { data, error } = await supabase
         .from('files')
         .select('*')
@@ -73,21 +86,20 @@ const FilesList: React.FC<FilesListProps> = ({
         console.error('Error fetching file metadata from Supabase:', error);
         
         if (error.code === '42P01') {
-          setError('Database tables are not set up correctly. Please try again in a moment.');
+          setError('The files table does not exist in the database. Please create it in your Supabase project.');
         } else {
           setError(`Failed to load your files: ${error.message}`);
         }
         
-        throw error;
+        setIsLoading(false);
+        return;
       }
       
       console.log('Files metadata retrieved from Supabase:', data);
       setFiles(data || []);
     } catch (error) {
       console.error('Error fetching files:', error);
-      if (!error) {
-        setError('Failed to load your files due to an unknown error');
-      }
+      setError('Failed to load your files due to an unexpected error');
     } finally {
       setIsLoading(false);
     }

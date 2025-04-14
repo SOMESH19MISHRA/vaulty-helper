@@ -18,9 +18,12 @@ export async function POST(req: Request) {
   try {
     console.log("[API] upload-to-s3: Request received");
     
+    // Make a clone of the request for parsing
+    const clonedReq = req.clone();
+    
     let body;
     try {
-      const text = await req.text();
+      const text = await clonedReq.text();
       console.log("[API] upload-to-s3: Request body (raw):", text);
       body = JSON.parse(text);
     } catch (parseError) {

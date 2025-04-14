@@ -19,19 +19,23 @@ const queryClient = new QueryClient();
 
 const App = () => {
   useEffect(() => {
-    // Initialize database tables when the app loads
-    const setupTables = async () => {
+    // Check if database tables exist when the app loads
+    const checkTables = async () => {
       try {
         const result = await initializeTables();
+        
         if (!result.success) {
-          console.error("Failed to initialize database tables:", result.error);
+          console.error("Failed to check database tables:", result.error);
+          toast.error("Database tables need to be created. Check console for table creation scripts.");
+        } else {
+          console.log("Database tables check complete");
         }
       } catch (error) {
-        console.error("Error in database initialization:", error);
+        console.error("Error in database tables check:", error);
       }
     };
     
-    setupTables();
+    checkTables();
   }, []);
 
   return (
