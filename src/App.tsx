@@ -1,3 +1,4 @@
+
 import React from 'react';
 import {
   createBrowserRouter,
@@ -12,37 +13,39 @@ import NotFound from './pages/NotFound';
 import { Toaster } from '@/components/ui/toaster';
 
 import Dashboard from './pages/Dashboard';
-import SharedFile from './pages/SharedFile'; // Add this import
+import SharedFile from './pages/SharedFile';
 
 const App = () => {
+  const router = createBrowserRouter([
+    {
+      path: '/',
+      element: <Index />
+    },
+    {
+      path: '/login',
+      element: <Login />
+    },
+    {
+      path: '/register',
+      element: <Register />
+    },
+    {
+      path: '/dashboard',
+      element: <Dashboard />
+    },
+    {
+      path: '/share/:token',
+      element: <SharedFile />
+    },
+    {
+      path: '*',
+      element: <NotFound />
+    }
+  ]);
+
   return (
     <AuthProvider>
-      <RouterProvider router={createBrowserRouter([
-        {
-          path: '/',
-          element: <Index />
-        },
-        {
-          path: '/login',
-          element: <Login />
-        },
-        {
-          path: '/register',
-          element: <Register />
-        },
-        {
-          path: '/dashboard',
-          element: <Dashboard />
-        },
-        {
-          path: '/share/:token',
-          element: <SharedFile />
-        },
-        {
-          path: '*',
-          element: <NotFound />
-        }
-      ])} />
+      <RouterProvider router={router} />
       <Toaster />
     </AuthProvider>
   );
