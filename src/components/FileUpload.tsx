@@ -7,11 +7,10 @@ import { supabase } from '@/lib/supabase';
 
 interface FileUploadProps {
   userId: string;
-  folderId: string | null;
   onUploadSuccess: () => void;
 }
 
-const FileUpload: React.FC<FileUploadProps> = ({ userId, folderId, onUploadSuccess }) => {
+const FileUpload: React.FC<FileUploadProps> = ({ userId, onUploadSuccess }) => {
   const [isUploading, setIsUploading] = useState(false);
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -55,28 +54,7 @@ const FileUpload: React.FC<FileUploadProps> = ({ userId, folderId, onUploadSucce
           return null;
         }
         
-        // After successful upload to storage, save metadata to files table
-        const { data: fileData, error: fileError } = await supabase
-          .from('files')
-          .insert({
-            name: file.name,
-            size: file.size,
-            type: file.type || getFileExtension(file.name),
-            user_id: userId,
-            folder_id: folderId,
-            path: filePath
-          })
-          .select()
-          .single();
-          
-        if (fileError) {
-          console.error('Error saving file metadata:', fileError);
-          toast.dismiss(toastId);
-          toast.error(`Failed to save file metadata: ${fileError.message}`);
-          return null;
-        }
-        
-        uploadResult = fileData;
+        uploadResult = filePath;
       } catch (uploadError: any) {
         console.error('Exception during upload:', uploadError);
         toast.dismiss(toastId);
@@ -85,7 +63,7 @@ const FileUpload: React.FC<FileUploadProps> = ({ userId, folderId, onUploadSucce
       }
       
       if (uploadResult) {
-        console.log('File uploaded successfully:', uploadResult);
+        console.log('File uploaded successfully to path:', uploadResult);
         toast.dismiss(toastId);
         toast.success('File uploaded successfully');
         
@@ -102,12 +80,6 @@ const FileUpload: React.FC<FileUploadProps> = ({ userId, folderId, onUploadSucce
     } finally {
       setIsUploading(false);
     }
-  };
-  
-  // Helper function to get file extension when MIME type is not available
-  const getFileExtension = (filename: string): string => {
-    const parts = filename.split('.');
-    return parts.length > 1 ? parts[parts.length - 1].toLowerCase() : 'unknown';
   };
 
   return (
@@ -130,9 +102,6 @@ const FileUpload: React.FC<FileUploadProps> = ({ userId, folderId, onUploadSucce
             <Upload className="h-6 w-6 mb-2" />
             <span>{isUploading ? 'Uploading...' : 'Upload File'}</span>
             <p className="text-xs text-muted-foreground mt-1">
-              {folderId ? 'Uploading to selected folder' : 'Uploading to root folder'}
-            </p>
-            <p className="text-xs text-muted-foreground">
               Max file size: 50MB
             </p>
           </div>
