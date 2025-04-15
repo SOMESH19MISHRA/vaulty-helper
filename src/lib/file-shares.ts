@@ -8,8 +8,12 @@ export interface FileShare {
   file_id: string;
   user_id: string;
   share_token: string;
-  expires_at: string;
+  expires_at: string | null;
   created_at: string;
+  files?: {
+    name: string;
+    type: string;
+  };
 }
 
 export type ExpirationOption = '1h' | '24h' | '7d' | '30d' | 'never';
